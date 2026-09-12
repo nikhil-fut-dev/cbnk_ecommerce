@@ -5,8 +5,8 @@ import {
   uploadToCloudinary,
   deleteFromCloudinary,
 } from "../utils/uploadToCloudinary.js";
-
 import { validateProductInput } from "../validators/productValidator.js";
+import { createOrSyncInventory } from "../services/inventoryService.js";
 
 const createSlug = (name) => {
   return name
@@ -233,6 +233,8 @@ export const createProduct = async (req, res) => {
 
       isBestSeller: isBestSeller === true || isBestSeller === "true",
     });
+
+    await createOrSyncInventory(product._id);
 
     await product.populate("category", "name slug");
 
@@ -897,6 +899,8 @@ export const updateProduct = async (req, res) => {
     // --------------------------------
 
     await product.save();
+
+    await createOrSyncInventory(product._id);
 
     await product.populate("category", "name slug");
     await product.populate("subCategory", "name slug");
