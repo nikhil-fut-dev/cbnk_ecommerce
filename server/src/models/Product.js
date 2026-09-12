@@ -1,5 +1,8 @@
 import mongoose from "mongoose";
 
+/**
+ * Product Image Schema
+ */
 const productImageSchema = new mongoose.Schema(
   {
     url: {
@@ -20,9 +23,14 @@ const productImageSchema = new mongoose.Schema(
       trim: true,
     },
   },
-  { _id: false },
+  {
+    _id: false,
+  },
 );
 
+/**
+ * Product Variant Schema
+ */
 const productVariantSchema = new mongoose.Schema(
   {
     size: {
@@ -67,11 +75,13 @@ const productVariantSchema = new mongoose.Schema(
       url: {
         type: String,
         default: "",
+        trim: true,
       },
 
       publicId: {
         type: String,
         default: "",
+        trim: true,
       },
     },
 
@@ -80,11 +90,20 @@ const productVariantSchema = new mongoose.Schema(
       default: true,
     },
   },
-  { _id: true },
+  {
+    _id: true,
+  },
 );
 
+/**
+ * Product Schema
+ */
 const productSchema = new mongoose.Schema(
   {
+    // --------------------------------
+    // Basic Information
+    // --------------------------------
+
     name: {
       type: String,
       required: [true, "Product name is required"],
@@ -99,7 +118,6 @@ const productSchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      index: true,
     },
 
     description: {
@@ -111,9 +129,13 @@ const productSchema = new mongoose.Schema(
     shortDescription: {
       type: String,
       trim: true,
-      maxlength: 300,
+      maxlength: [300, "Short description cannot exceed 300 characters"],
       default: "",
     },
+
+    // --------------------------------
+    // Category
+    // --------------------------------
 
     category: {
       type: mongoose.Schema.Types.ObjectId,
@@ -147,6 +169,10 @@ const productSchema = new mongoose.Schema(
       default: "ADULT",
     },
 
+    // --------------------------------
+    // Pricing
+    // --------------------------------
+
     price: {
       type: Number,
       required: [true, "Product price is required"],
@@ -155,16 +181,20 @@ const productSchema = new mongoose.Schema(
 
     compareAtPrice: {
       type: Number,
-      min: 0,
+      min: [0, "Compare-at price cannot be negative"],
       default: null,
     },
 
     discount: {
       type: Number,
-      min: 0,
-      max: 100,
+      min: [0, "Discount cannot be less than 0"],
+      max: [100, "Discount cannot exceed 100"],
       default: 0,
     },
+
+    // --------------------------------
+    // Inventory
+    // --------------------------------
 
     SKU: {
       type: String,
@@ -172,20 +202,27 @@ const productSchema = new mongoose.Schema(
       unique: true,
       trim: true,
       uppercase: true,
-      index: true,
     },
 
     stock: {
       type: Number,
       required: true,
-      min: 0,
+      min: [0, "Stock cannot be negative"],
       default: 0,
     },
+
+    // --------------------------------
+    // Images
+    // --------------------------------
 
     images: {
       type: [productImageSchema],
       default: [],
     },
+
+    // --------------------------------
+    // Product Options
+    // --------------------------------
 
     sizes: {
       type: [String],
@@ -201,6 +238,10 @@ const productSchema = new mongoose.Schema(
       type: [productVariantSchema],
       default: [],
     },
+
+    // --------------------------------
+    // Product Details
+    // --------------------------------
 
     tags: {
       type: [String],
@@ -219,18 +260,26 @@ const productSchema = new mongoose.Schema(
       default: {},
     },
 
+    // --------------------------------
+    // Reviews
+    // --------------------------------
+
     rating: {
       type: Number,
-      min: 0,
-      max: 5,
+      min: [0, "Rating cannot be less than 0"],
+      max: [5, "Rating cannot exceed 5"],
       default: 0,
     },
 
     reviewCount: {
       type: Number,
-      min: 0,
+      min: [0, "Review count cannot be negative"],
       default: 0,
     },
+
+    // --------------------------------
+    // Product Status
+    // --------------------------------
 
     isFeatured: {
       type: Boolean,
@@ -238,7 +287,7 @@ const productSchema = new mongoose.Schema(
       index: true,
     },
 
-    isNew: {
+    isNewArrival: {
       type: Boolean,
       default: true,
       index: true,
@@ -262,25 +311,48 @@ const productSchema = new mongoose.Schema(
       index: true,
     },
   },
+
   {
     timestamps: true,
   },
 );
 
-productSchema.index({ slug: 1 }, { unique: true });
-productSchema.index({ SKU: 1 }, { unique: true });
+// --------------------------------
+// Compound Indexes
+// --------------------------------
 
-productSchema.index({ category: 1, isActive: 1 });
-productSchema.index({ subCategory: 1, isActive: 1 });
+productSchema.index({
+  category: 1,
+  isActive: 1,
+});
 
-productSchema.index({ price: 1 });
-productSchema.index({ rating: -1 });
+productSchema.index({
+  subCategory: 1,
+  isActive: 1,
+});
 
-productSchema.index({ isFeatured: 1, isActive: 1 });
-productSchema.index({ isNew: 1, isActive: 1 });
-productSchema.index({ isBestSeller: 1, isActive: 1 });
+productSchema.index({
+  isFeatured: 1,
+  isActive: 1,
+});
 
-productSchema.index({ createdAt: -1 });
+productSchema.index({
+  isNewArrival: 1,
+  isActive: 1,
+});
+
+productSchema.index({
+  isBestSeller: 1,
+  isActive: 1,
+});
+
+productSchema.index({
+  createdAt: -1,
+});
+
+// --------------------------------
+// Product Model
+// --------------------------------
 
 const Product = mongoose.model("Product", productSchema);
 
