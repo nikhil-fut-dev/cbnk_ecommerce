@@ -4,6 +4,8 @@ import {
   createProduct,
   getProducts,
   getProductBySlug,
+  updateProduct,
+  deleteProduct,
 } from "../controllers/productController.js";
 
 import { protect } from "../middleware/authMiddleware.js";
@@ -18,5 +20,9 @@ router.get("/:slug", getProductBySlug);
 
 // Admin
 router.post("/", protect, adminOnly, uploadProductImages, createProduct);
+
+router.put("/:id", protect, adminOnly, uploadProductImages, updateProduct);
+
+router.delete("/:id", protect, adminOnly, deleteProduct);
 
 export default router;

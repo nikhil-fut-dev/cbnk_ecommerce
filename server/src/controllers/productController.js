@@ -1,7 +1,10 @@
 import Product from "../models/Product.js";
 import Category from "../models/Category.js";
 import cloudinary from "../config/cloudinary.js";
-import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
+import {
+  uploadToCloudinary,
+  deleteFromCloudinary,
+} from "../utils/uploadToCloudinary.js";
 
 const createSlug = (name) => {
   return name
@@ -331,6 +334,367 @@ export const getProductBySlug = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch product",
+    });
+  }
+};
+
+export const updateProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const product = await Product.findById(id);
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    const {
+      name,
+      description,
+      shortDescription,
+      category,
+      subCategory,
+      brand,
+      gender,
+      ageGroup,
+      price,
+      compareAtPrice,
+      discount,
+      SKU,
+      stock,
+      sizes,
+      colors,
+      variants,
+      tags,
+      material,
+      specifications,
+      isFeatured,
+      isNew,
+      isBestSeller,
+      isActive,
+      keepImages,
+    } = req.body;
+
+    // --------------------------------
+    // Validate category
+    // --------------------------------
+
+    if (category) {
+      const categoryExists = await Category.findOne({
+        _id: category,
+        isActive: true,
+      });
+
+      if (!categoryExists) {
+        return res.status(404).json({
+          success: false,
+          message: "Category not found",
+        });
+      }
+    }
+
+    if (subCategory) {
+      const subCategoryExists = await Category.findOne({
+        _id: subCategory,
+        isActive: true,
+      });
+
+      if (!subCategoryExists) {
+        return res.status(404).json({
+          success: false,
+          message: "Subcategory not found",
+        });
+      }
+    }
+
+    // --------------------------------
+    // Validate SKU
+    // --------------------------------
+
+    if (SKU) {
+      const normalizedSKU = SKU.trim().toUpperCase();
+
+      const existingSKU = await Product.findOne({
+        SKU: normalizedSKU,
+        _id: { $ne: id },
+      });
+
+      if (existingSKU) {
+        return res.status(409).json({
+          success: false,
+          message: "Another product already uses this SKU",
+        });
+      }
+    }
+
+    // --------------------------------
+    // Update basic fields
+    // --------------------------------
+
+    if (name !== undefined) {
+      product.name = name.trim();
+      product.slug = createSlug(name);
+    }
+
+    if (description !== undefined) {
+      product.description = description.trim();
+    }
+
+    if (shortDescription !== undefined) {
+      product.shortDescription = shortDescription.trim();
+    }
+
+    if (category !== undefined) {
+      product.category = category;
+    }
+
+    if (subCategory !== undefined) {
+      product.subCategory = subCategory || null;
+    }
+
+    if (brand !== undefined) {
+      product.brand = brand.trim();
+    }
+
+    if (gender !== undefined) {
+      product.gender = gender;
+    }
+
+    if (ageGroup !== undefined) {
+      product.ageGroup = ageGroup;
+    }
+
+    if (price !== undefined) {
+      product.price = Number(price);
+    }
+
+    if (compareAtPrice !== undefined) {
+      product.compareAtPrice =
+        compareAtPrice === "" || compareAtPrice === null
+          ? null
+          : Number(compareAtPrice);
+    }
+
+    if (discount !== undefined) {
+      product.discount = Number(discount);
+    }
+
+    if (SKU !== undefined) {
+      product.SKU = SKU.trim().toUpperCase();
+    }
+
+    if (stock !== undefined) {
+      product.stock = Number(stock);
+    }
+
+    // --------------------------------
+    // Parse arrays
+    // --------------------------------
+
+    const parseArray = (value) => {
+      if (value === undefined || value === null || value === "") {
+        return null;
+      }
+
+      if (Array.isArray(value)) {
+        return value;
+      }
+
+      try {
+        const parsed = JSON.parse(value);
+
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return value
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+      }
+    };
+
+    const parsedSizes = parseArray(sizes);
+    const parsedColors = parseArray(colors);
+    const parsedVariants = parseArray(variants);
+    const parsedTags = parseArray(tags);
+
+    if (parsedSizes !== null) {
+      product.sizes = parsedSizes;
+    }
+
+    if (parsedColors !== null) {
+      product.colors = parsedColors;
+    }
+
+    if (parsedVariants !== null) {
+      product.variants = parsedVariants;
+    }
+
+    if (parsedTags !== null) {
+      product.tags = parsedTags;
+    }
+
+    // --------------------------------
+    // Specifications
+    // --------------------------------
+
+    if (specifications !== undefined) {
+      try {
+        product.specifications =
+          typeof specifications === "string"
+            ? JSON.parse(specifications)
+            : specifications;
+      } catch {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid specifications format",
+        });
+      }
+    }
+
+    if (material !== undefined) {
+      product.material = material.trim();
+    }
+
+    // --------------------------------
+    // Product flags
+    // --------------------------------
+
+    if (isFeatured !== undefined) {
+      product.isFeatured = isFeatured === true || isFeatured === "true";
+    }
+
+    if (isNew !== undefined) {
+      product.isNew = isNew === true || isNew === "true";
+    }
+
+    if (isBestSeller !== undefined) {
+      product.isBestSeller = isBestSeller === true || isBestSeller === "true";
+    }
+
+    if (isActive !== undefined) {
+      product.isActive = isActive === true || isActive === "true";
+    }
+
+    // --------------------------------
+    // Existing images to keep
+    // --------------------------------
+
+    let imagesToKeep = product.images || [];
+
+    if (keepImages !== undefined) {
+      try {
+        imagesToKeep =
+          typeof keepImages === "string" ? JSON.parse(keepImages) : keepImages;
+
+        if (!Array.isArray(imagesToKeep)) {
+          imagesToKeep = [];
+        }
+      } catch {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid keepImages format",
+        });
+      }
+    }
+
+    // --------------------------------
+    // Delete removed Cloudinary images
+    // --------------------------------
+
+    const oldImages = product.images || [];
+
+    const keptPublicIds = new Set(
+      imagesToKeep.map((image) => image.publicId).filter(Boolean),
+    );
+
+    for (const oldImage of oldImages) {
+      if (oldImage.publicId && !keptPublicIds.has(oldImage.publicId)) {
+        await deleteFromCloudinary(oldImage.publicId);
+      }
+    }
+
+    // --------------------------------
+    // Upload new images
+    // --------------------------------
+
+    const newImages = [];
+
+    if (req.files?.length) {
+      for (const file of req.files) {
+        const uploaded = await uploadToCloudinary(file.buffer, "cbnk/products");
+
+        newImages.push({
+          url: uploaded.url,
+          publicId: uploaded.publicId,
+          alt: product.name,
+        });
+      }
+    }
+
+    product.images = [...imagesToKeep, ...newImages];
+
+    // --------------------------------
+    // Save
+    // --------------------------------
+
+    await product.save();
+
+    await product.populate("category", "name slug");
+    await product.populate("subCategory", "name slug");
+
+    return res.status(200).json({
+      success: true,
+      message: "Product updated successfully",
+      product,
+    });
+  } catch (error) {
+    console.error("Update product error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update product",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
+
+export const deleteProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const product = await Product.findById(id);
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    // Delete all product images from Cloudinary
+    if (product.images?.length) {
+      for (const image of product.images) {
+        if (image.publicId) {
+          await deleteFromCloudinary(image.publicId);
+        }
+      }
+    }
+
+    await Product.findByIdAndDelete(id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Product deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete product error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete product",
     });
   }
 };
