@@ -41,7 +41,7 @@ export const createProduct = async (req, res) => {
       material,
       specifications,
       isFeatured,
-      isNewArrival,
+      isNew,
       isBestSeller,
     } = req.body;
 
@@ -229,7 +229,7 @@ export const createProduct = async (req, res) => {
 
       isFeatured: isFeatured === true || isFeatured === "true",
 
-      isNewArrival: isNewArrival === undefined ? true : isNewArrival === true || isNewArrival === "true",
+      isNew: isNew === undefined ? true : isNew === true || isNew === "true",
 
       isBestSeller: isBestSeller === true || isBestSeller === "true",
     });
@@ -417,7 +417,7 @@ export const getProducts = async (req, res) => {
     }
 
     if (newArrivals === "true") {
-      filter.isNewArrival = true;
+      filter.isNew = true;
     }
 
     if (bestSeller === "true") {
@@ -598,7 +598,7 @@ export const updateProduct = async (req, res) => {
       material,
       specifications,
       isFeatured,
-      isNewArrival,
+      isNew,
       isBestSeller,
       isActive,
       keepImages,
@@ -822,8 +822,8 @@ export const updateProduct = async (req, res) => {
       product.isFeatured = isFeatured === true || isFeatured === "true";
     }
 
-    if (isNewArrival !== undefined) {
-      product.isNewArrival = isNewArrival === true || isNewArrival === "true";
+    if (isNew !== undefined) {
+      product.isNew = isNew === true || isNew === "true";
     }
 
     if (isBestSeller !== undefined) {
