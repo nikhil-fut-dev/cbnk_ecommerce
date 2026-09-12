@@ -8,6 +8,7 @@ import {
 
 import { protect } from "../middleware/authMiddleware.js";
 import { adminOnly } from "../middleware/adminMiddleware.js";
+import { uploadProductImages } from "../middleware/uploadMiddleware.js";
 
 const router = express.Router();
 
@@ -16,6 +17,6 @@ router.get("/", getProducts);
 router.get("/:slug", getProductBySlug);
 
 // Admin
-router.post("/", protect, adminOnly, createProduct);
+router.post("/", protect, adminOnly, uploadProductImages, createProduct);
 
 export default router;

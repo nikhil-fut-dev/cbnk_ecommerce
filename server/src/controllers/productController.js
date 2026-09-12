@@ -1,5 +1,7 @@
 import Product from "../models/Product.js";
 import Category from "../models/Category.js";
+import cloudinary from "../config/cloudinary.js";
+import { uploadToCloudinary } from "../utils/uploadToCloudinary.js";
 
 const createSlug = (name) => {
   return name
@@ -27,7 +29,6 @@ export const createProduct = async (req, res) => {
       discount,
       SKU,
       stock,
-      images,
       sizes,
       colors,
       variants,
@@ -60,10 +61,10 @@ export const createProduct = async (req, res) => {
       });
     }
 
-    if (price === undefined || price === null) {
+    if (price === undefined || price === null || Number(price) < 0) {
       return res.status(400).json({
         success: false,
-        message: "Product price is required",
+        message: "Valid product price is required",
       });
     }
 
@@ -113,6 +114,61 @@ export const createProduct = async (req, res) => {
       });
     }
 
+    // Parse array fields coming from multipart/form-data
+    const parseArray = (value) => {
+      if (!value) return [];
+
+      if (Array.isArray(value)) {
+        return value;
+      }
+
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return value
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+      }
+    };
+
+    const parsedSizes = parseArray(sizes);
+    const parsedColors = parseArray(colors);
+    const parsedVariants = parseArray(variants);
+    const parsedTags = parseArray(tags);
+
+    let parsedSpecifications = {};
+
+    if (specifications) {
+      try {
+        parsedSpecifications =
+          typeof specifications === "string"
+            ? JSON.parse(specifications)
+            : specifications;
+      } catch {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid specifications format",
+        });
+      }
+    }
+
+    // Upload images to Cloudinary
+    const uploadedImages = [];
+
+    if (req.files?.length) {
+      for (const file of req.files) {
+        const uploaded = await uploadToCloudinary(file.buffer, "cbnk/products");
+
+        uploadedImages.push({
+          url: uploaded.url,
+          publicId: uploaded.publicId,
+          alt: name.trim(),
+        });
+      }
+    }
+
     const product = await Product.create({
       name: name.trim(),
       slug,
@@ -123,24 +179,36 @@ export const createProduct = async (req, res) => {
       brand: brand?.trim() || "CBNK",
       gender: gender || "WOMEN",
       ageGroup: ageGroup || "ADULT",
+
       price: Number(price),
+
       compareAtPrice:
-        compareAtPrice !== undefined && compareAtPrice !== null
+        compareAtPrice !== undefined && compareAtPrice !== ""
           ? Number(compareAtPrice)
           : null,
+
       discount: Number(discount) || 0,
+
       SKU: SKU.trim().toUpperCase(),
+
       stock: Number(stock) || 0,
-      images: Array.isArray(images) ? images : [],
-      sizes: Array.isArray(sizes) ? sizes : [],
-      colors: Array.isArray(colors) ? colors : [],
-      variants: Array.isArray(variants) ? variants : [],
-      tags: Array.isArray(tags) ? tags : [],
+
+      images: uploadedImages,
+
+      sizes: parsedSizes,
+      colors: parsedColors,
+      variants: parsedVariants,
+      tags: parsedTags,
+
       material: material?.trim() || "",
-      specifications: specifications || {},
-      isFeatured: Boolean(isFeatured),
-      isNew: isNew !== undefined ? Boolean(isNew) : true,
-      isBestSeller: Boolean(isBestSeller),
+
+      specifications: parsedSpecifications,
+
+      isFeatured: isFeatured === true || isFeatured === "true",
+
+      isNew: isNew === undefined ? true : isNew === true || isNew === "true",
+
+      isBestSeller: isBestSeller === true || isBestSeller === "true",
     });
 
     await product.populate("category", "name slug");
@@ -156,6 +224,7 @@ export const createProduct = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to create product",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 };
