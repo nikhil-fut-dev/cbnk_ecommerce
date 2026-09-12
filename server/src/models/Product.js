@@ -37,6 +37,12 @@ const productVariantSchema = new mongoose.Schema(
       default: "",
     },
 
+    colorCode: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     SKU: {
       type: String,
       required: true,
@@ -47,6 +53,7 @@ const productVariantSchema = new mongoose.Schema(
     price: {
       type: Number,
       min: 0,
+      default: null,
     },
 
     stock: {
@@ -54,6 +61,23 @@ const productVariantSchema = new mongoose.Schema(
       required: true,
       min: 0,
       default: 0,
+    },
+
+    image: {
+      url: {
+        type: String,
+        default: "",
+      },
+
+      publicId: {
+        type: String,
+        default: "",
+      },
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
     },
   },
   { _id: true },
@@ -231,11 +255,32 @@ const productSchema = new mongoose.Schema(
       default: true,
       index: true,
     },
+
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
   },
   {
     timestamps: true,
   },
 );
+
+productSchema.index({ slug: 1 }, { unique: true });
+productSchema.index({ SKU: 1 }, { unique: true });
+
+productSchema.index({ category: 1, isActive: 1 });
+productSchema.index({ subCategory: 1, isActive: 1 });
+
+productSchema.index({ price: 1 });
+productSchema.index({ rating: -1 });
+
+productSchema.index({ isFeatured: 1, isActive: 1 });
+productSchema.index({ isNew: 1, isActive: 1 });
+productSchema.index({ isBestSeller: 1, isActive: 1 });
+
+productSchema.index({ createdAt: -1 });
 
 const Product = mongoose.model("Product", productSchema);
 

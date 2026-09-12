@@ -6,6 +6,8 @@ import {
   deleteFromCloudinary,
 } from "../utils/uploadToCloudinary.js";
 
+import { validateProductInput } from "../validators/productValidator.js";
+
 const createSlug = (name) => {
   return name
     .toLowerCase()
@@ -42,6 +44,24 @@ export const createProduct = async (req, res) => {
       isNew,
       isBestSeller,
     } = req.body;
+
+    const validation = validateProductInput({
+      name,
+      description,
+      category,
+      price,
+      SKU,
+      gender,
+      ageGroup,
+    });
+
+    if (!validation.isValid) {
+      return res.status(400).json({
+        success: false,
+        message: "Product validation failed",
+        errors: validation.errors,
+      });
+    }
 
     if (!name?.trim()) {
       return res.status(400).json({
@@ -235,32 +255,32 @@ export const createProduct = async (req, res) => {
 // GET ALL PRODUCTS
 export const getProducts = async (req, res) => {
   try {
-    const { category, gender, featured, newArrivals, bestSeller, search } =
-      req.query;
+    const {
+      search,
+      category,
+      subCategory,
+      gender,
+      size,
+      color,
+      minPrice,
+      maxPrice,
+      inStock,
+      featured,
+      newArrivals,
+      bestSeller,
+      sort = "newest",
+      page = 1,
+      limit = 12,
+    } = req.query;
 
     const filter = {
       isActive: true,
+      isDeleted: false,
     };
 
-    if (category) {
-      filter.category = category;
-    }
-
-    if (gender) {
-      filter.gender = gender.toUpperCase();
-    }
-
-    if (featured === "true") {
-      filter.isFeatured = true;
-    }
-
-    if (newArrivals === "true") {
-      filter.isNew = true;
-    }
-
-    if (bestSeller === "true") {
-      filter.isBestSeller = true;
-    }
+    // --------------------------------
+    // Search
+    // --------------------------------
 
     if (search?.trim()) {
       filter.$or = [
@@ -282,18 +302,223 @@ export const getProducts = async (req, res) => {
             $options: "i",
           },
         },
+        {
+          brand: {
+            $regex: search.trim(),
+            $options: "i",
+          },
+        },
+        {
+          SKU: {
+            $regex: search.trim(),
+            $options: "i",
+          },
+        },
       ];
     }
 
-    const products = await Product.find(filter)
-      .populate("category", "name slug")
-      .populate("subCategory", "name slug")
-      .sort({ createdAt: -1 });
+    // --------------------------------
+    // Category
+    // --------------------------------
+
+    if (category) {
+      filter.category = category;
+    }
+
+    // --------------------------------
+    // Subcategory
+    // --------------------------------
+
+    if (subCategory) {
+      filter.subCategory = subCategory;
+    }
+
+    // --------------------------------
+    // Gender
+    // --------------------------------
+
+    if (gender) {
+      const genders = gender
+        .split(",")
+        .map((item) => item.trim().toUpperCase())
+        .filter(Boolean);
+
+      if (genders.length === 1) {
+        filter.gender = genders[0];
+      } else if (genders.length > 1) {
+        filter.gender = {
+          $in: genders,
+        };
+      }
+    }
+
+    // --------------------------------
+    // Size
+    // --------------------------------
+
+    if (size) {
+      const sizes = size
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      filter.sizes = {
+        $in: sizes,
+      };
+    }
+
+    // --------------------------------
+    // Color
+    // --------------------------------
+
+    if (color) {
+      const colors = color
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      filter.colors = {
+        $in: colors,
+      };
+    }
+
+    // --------------------------------
+    // Price Range
+    // --------------------------------
+
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      filter.price = {};
+
+      if (minPrice !== undefined && minPrice !== "") {
+        filter.price.$gte = Number(minPrice);
+      }
+
+      if (maxPrice !== undefined && maxPrice !== "") {
+        filter.price.$lte = Number(maxPrice);
+      }
+    }
+
+    // --------------------------------
+    // Stock
+    // --------------------------------
+
+    if (inStock === "true") {
+      filter.stock = {
+        $gt: 0,
+      };
+    }
+
+    // --------------------------------
+    // Product flags
+    // --------------------------------
+
+    if (featured === "true") {
+      filter.isFeatured = true;
+    }
+
+    if (newArrivals === "true") {
+      filter.isNew = true;
+    }
+
+    if (bestSeller === "true") {
+      filter.isBestSeller = true;
+    }
+
+    // --------------------------------
+    // Pagination
+    // --------------------------------
+
+    const currentPage = Math.max(Number(page) || 1, 1);
+
+    const perPage = Math.min(Math.max(Number(limit) || 12, 1), 100);
+
+    const skip = (currentPage - 1) * perPage;
+
+    // --------------------------------
+    // Sorting
+    // --------------------------------
+
+    let sortOption = {
+      createdAt: -1,
+    };
+
+    switch (sort) {
+      case "oldest":
+        sortOption = {
+          createdAt: 1,
+        };
+        break;
+
+      case "price-low":
+        sortOption = {
+          price: 1,
+        };
+        break;
+
+      case "price-high":
+        sortOption = {
+          price: -1,
+        };
+        break;
+
+      case "name-asc":
+        sortOption = {
+          name: 1,
+        };
+        break;
+
+      case "name-desc":
+        sortOption = {
+          name: -1,
+        };
+        break;
+
+      case "rating":
+        sortOption = {
+          rating: -1,
+          reviewCount: -1,
+        };
+        break;
+
+      case "newest":
+      default:
+        sortOption = {
+          createdAt: -1,
+        };
+        break;
+    }
+
+    // --------------------------------
+    // Database queries
+    // --------------------------------
+
+    const [products, totalProducts] = await Promise.all([
+      Product.find(filter)
+        .populate("category", "name slug")
+        .populate("subCategory", "name slug")
+        .sort(sortOption)
+        .skip(skip)
+        .limit(perPage)
+        .lean(),
+
+      Product.countDocuments(filter),
+    ]);
+
+    const totalPages = Math.ceil(totalProducts / perPage);
 
     return res.status(200).json({
       success: true,
-      count: products.length,
+
       products,
+
+      pagination: {
+        page: currentPage,
+        limit: perPage,
+        totalProducts,
+        totalPages,
+        hasNext: currentPage < totalPages,
+        hasPrev: currentPage > 1,
+      },
     });
   } catch (error) {
     console.error("Get products error:", error);
@@ -313,6 +538,7 @@ export const getProductBySlug = async (req, res) => {
     const product = await Product.findOne({
       slug,
       isActive: true,
+      isDeleted: false,
     })
       .populate("category", "name slug")
       .populate("subCategory", "name slug");
@@ -377,6 +603,24 @@ export const updateProduct = async (req, res) => {
       isActive,
       keepImages,
     } = req.body;
+
+    const validation = validateProductInput({
+      name,
+      description,
+      category,
+      price,
+      SKU,
+      gender,
+      ageGroup,
+    });
+
+    if (!validation.isValid) {
+      return res.status(400).json({
+        success: false,
+        message: "Product validation failed",
+        errors: validation.errors,
+      });
+    }
 
     // --------------------------------
     // Validate category
@@ -518,6 +762,18 @@ export const updateProduct = async (req, res) => {
     const parsedSizes = parseArray(sizes);
     const parsedColors = parseArray(colors);
     const parsedVariants = parseArray(variants);
+    const variantSKUs = parsedVariants
+      .map((variant) => variant?.SKU?.trim().toUpperCase())
+      .filter(Boolean);
+
+    const uniqueVariantSKUs = new Set(variantSKUs);
+
+    if (variantSKUs.length !== uniqueVariantSKUs.size) {
+      return res.status(400).json({
+        success: false,
+        message: "Variant SKUs must be unique",
+      });
+    }
     const parsedTags = parseArray(tags);
 
     if (parsedSizes !== null) {
@@ -683,11 +939,14 @@ export const deleteProduct = async (req, res) => {
       }
     }
 
-    await Product.findByIdAndDelete(id);
+    product.isActive = false;
+    product.isDeleted = true;
+
+    await product.save();
 
     return res.status(200).json({
       success: true,
-      message: "Product deleted successfully",
+      message: "Product archived successfully",
     });
   } catch (error) {
     console.error("Delete product error:", error);

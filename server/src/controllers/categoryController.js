@@ -12,13 +12,37 @@ const createSlug = (name) => {
 // CREATE CATEGORY
 export const createCategory = async (req, res) => {
   try {
-    const { name, description, image, sortOrder } = req.body;
+    const { name, description, image, sortOrder, parentCategory } = req.body;
 
     if (!name?.trim()) {
       return res.status(400).json({
         success: false,
         message: "Category name is required",
       });
+    }
+
+    let parent = null;
+
+    if (parentCategory) {
+      parent = await Category.findOne({
+        _id: parentCategory,
+        isActive: true,
+      });
+
+      if (!parent) {
+        return res.status(404).json({
+          success: false,
+          message: "Parent category not found",
+        });
+      }
+
+      // Prevent creating more than one nested level
+      if (parent.parentCategory) {
+        return res.status(400).json({
+          success: false,
+          message: "Subcategory cannot have another subcategory",
+        });
+      }
     }
 
     const slug = createSlug(name);
@@ -40,6 +64,7 @@ export const createCategory = async (req, res) => {
       description: description?.trim() || "",
       image: image || "",
       sortOrder: Number(sortOrder) || 0,
+      parentCategory: parent?._id || null,
     });
 
     return res.status(201).json({
@@ -60,14 +85,24 @@ export const createCategory = async (req, res) => {
 // GET ALL CATEGORIES
 export const getCategories = async (req, res) => {
   try {
-    const { includeInactive } = req.query;
+    const { includeInactive, parent } = req.query;
 
     const filter = includeInactive === "true" ? {} : { isActive: true };
 
-    const categories = await Category.find(filter).sort({
-      sortOrder: 1,
-      createdAt: -1,
-    });
+    if (parent === "root") {
+      filter.parentCategory = null;
+    }
+
+    if (parent && parent !== "root") {
+      filter.parentCategory = parent;
+    }
+
+    const categories = await Category.find(filter)
+      .populate("parentCategory", "name slug")
+      .sort({
+        sortOrder: 1,
+        createdAt: -1,
+      });
 
     return res.status(200).json({
       success: true,
