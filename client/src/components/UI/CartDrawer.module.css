@@ -1,0 +1,47 @@
+.drawer {
+  position: fixed;
+  right: -100%;
+  top: 0;
+  width: 340px;
+  height: 100%;
+  background: #fff;
+  box-shadow: -5px 0 20px rgba(0, 0, 0, 0.2);
+  padding: 20px;
+  transition: 0.4s;
+  z-index: 1002;
+  overflow-y: auto;
+}
+.drawer.active {
+  right: 0;
+}
+.closeBtn {
+  display: inline-flex;
+  cursor: pointer;
+  font-size: 20px;
+  padding: 5px;
+  border: 1px solid #dfdfdf;
+  margin-bottom: 10px;
+}
+.item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 10px 0;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 8px;
+}
+.qtyControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.qtyBtn {
+  width: 25px;
+  height: 25px;
+  border: none;
+  background: #ff6600;
+  color: #fff;
+  cursor: pointer;
+  font-weight: bold;
+  border-radius: 4px;
+}

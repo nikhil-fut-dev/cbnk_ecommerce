@@ -1,0 +1,90 @@
+.container,
+.kidsContainer {
+  max-width: 1276px;
+  margin: auto;
+  padding: 20px 10px;
+}
+.title,
+.kidsTitle {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  position: relative;
+}
+.title::after,
+.kidsTitle::after {
+  content: "";
+  width: 50px;
+  height: 5px;
+  background: #d1ac88;
+  position: absolute;
+  bottom: -6px;
+  left: 0;
+}
+.cardRow,
+.kidsCardRow {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+}
+.cardRow::-webkit-scrollbar,
+.kidsCardRow::-webkit-scrollbar {
+  display: none;
+}
+
+.card {
+  width: 237.8px;
+  height: 320px;
+  position: relative;
+  flex-shrink: 0;
+  cursor: pointer;
+  background: #ddd;
+}
+.kidsCard {
+  width: 196px;
+  height: 250px;
+  position: relative;
+  flex-shrink: 0;
+  cursor: pointer;
+  background: #ddd;
+}
+
+.card img,
+.kidsCard img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.card::after,
+.kidsCard::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent);
+}
+.card span,
+.kidsCard span {
+  position: absolute;
+  bottom: 15px;
+  left: 15px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  z-index: 2;
+}
+
+@media (max-width: 768px) {
+  .title,
+  .kidsTitle {
+    font-size: 18px;
+  }
+  .card {
+    width: 180px;
+    height: 250px;
+  }
+  .kidsCard {
+    width: 152.3px;
+    height: 200px;
+  }
+}
