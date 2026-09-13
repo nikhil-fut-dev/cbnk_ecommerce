@@ -107,4 +107,38 @@ app.get("/", (req, res) => {
   });
 });
 
+// 404 - Route not found
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
+  });
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error("Global error:", err);
+
+  // Multer errors
+  if (err.name === "MulterError") {
+    return res.status(400).json({
+      success: false,
+      message: err.message || "File upload error",
+    });
+  }
+
+  // Invalid JSON
+  if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid JSON payload",
+    });
+  }
+
+  return res.status(err.statusCode || 500).json({
+    success: false,
+    message: err.message || "Internal server error",
+  });
+});
+
 export default app;
