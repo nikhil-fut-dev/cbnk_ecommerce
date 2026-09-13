@@ -18,6 +18,8 @@ import inventoryRoutes from "./routes/inventoryRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
 import adminOrderRoutes from "./routes/adminOrderRoutes.js";
+import adminProductRoutes from "./routes/adminProductRoutes.js";
+import adminCouponRoutes from "./routes/adminCouponRoutes.js";
 
 const app = express();
 
@@ -81,6 +83,8 @@ app.use("/api/v1/inventory", inventoryRoutes);
 app.use("/api/v1/payments", paymentRoutes);
 app.use("/api/v1/reviews", reviewRoutes);
 app.use("/api/v1/admin/orders", adminOrderRoutes);
+app.use("/api/v1/admin/products", adminProductRoutes);
+app.use("/api/v1/admin/coupons", adminCouponRoutes);
 
 // Health
 app.get("/api/v1/health", (req, res) => {

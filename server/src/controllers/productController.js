@@ -1,12 +1,16 @@
 import Product from "../models/Product.js";
 import Category from "../models/Category.js";
+import Inventory from "../models/Inventory.js";
 import cloudinary from "../config/cloudinary.js";
 import {
   uploadToCloudinary,
   deleteFromCloudinary,
 } from "../utils/uploadToCloudinary.js";
 import { validateProductInput } from "../validators/productValidator.js";
-import { createOrSyncInventory } from "../services/inventoryService.js";
+import {
+  createOrSyncInventory,
+  getInventoryByProduct,
+} from "../services/inventoryService.js";
 
 const createSlug = (name) => {
   return name
@@ -229,7 +233,10 @@ export const createProduct = async (req, res) => {
 
       isFeatured: isFeatured === true || isFeatured === "true",
 
-      isNewArrival: isNewArrival === undefined ? true : isNewArrival === true || isNewArrival === "true",
+      isNewArrival:
+        isNewArrival === undefined
+          ? true
+          : isNewArrival === true || isNewArrival === "true",
 
       isBestSeller: isBestSeller === true || isBestSeller === "true",
     });
@@ -401,16 +408,6 @@ export const getProducts = async (req, res) => {
     }
 
     // --------------------------------
-    // Stock
-    // --------------------------------
-
-    if (inStock === "true") {
-      filter.stock = {
-        $gt: 0,
-      };
-    }
-
-    // --------------------------------
     // Product flags
     // --------------------------------
 
@@ -494,17 +491,58 @@ export const getProducts = async (req, res) => {
     // Database queries
     // --------------------------------
 
-    const [products, totalProducts] = await Promise.all([
-      Product.find(filter)
-        .populate("category", "name slug")
-        .populate("subCategory", "name slug")
-        .sort(sortOption)
-        .skip(skip)
-        .limit(perPage)
-        .lean(),
+    let products = await Product.find(filter)
+      .populate("category", "name slug")
+      .populate("subCategory", "name slug")
+      .sort(sortOption)
+      .skip(skip)
+      .limit(perPage)
+      .lean();
 
-      Product.countDocuments(filter),
-    ]);
+    const totalProducts = await Product.countDocuments(filter);
+
+    // Attach real inventory data
+    const productIds = products.map((product) => product._id);
+
+    const inventories = await Inventory.find({
+      product: { $in: productIds },
+    })
+      .select(
+        "product totalStock reservedStock soldStock lowStockThreshold variants",
+      )
+      .lean();
+
+    const inventoryMap = new Map(
+      inventories.map((inventory) => [inventory.product.toString(), inventory]),
+    );
+
+    products = products.map((product) => {
+      const inventory = inventoryMap.get(product._id.toString());
+
+      if (!inventory) {
+        return {
+          ...product,
+          availableStock: 0,
+          inventory: null,
+        };
+      }
+
+      const availableStock = Math.max(
+        inventory.totalStock - inventory.reservedStock,
+        0,
+      );
+
+      return {
+        ...product,
+        availableStock,
+        inventory,
+      };
+    });
+
+    // inStock must use Inventory, not Product.stock
+    if (inStock === "true") {
+      products = products.filter((product) => product.availableStock > 0);
+    }
 
     const totalPages = Math.ceil(totalProducts / perPage);
 
@@ -545,6 +583,22 @@ export const getProductBySlug = async (req, res) => {
       .populate("category", "name slug")
       .populate("subCategory", "name slug");
 
+    const inventory = await Inventory.findOne({
+      product: product._id,
+    })
+      .select(
+        "product totalStock reservedStock soldStock lowStockThreshold variants",
+      )
+      .lean();
+
+    const productData = product.toObject();
+
+    productData.availableStock = inventory
+      ? Math.max(inventory.totalStock - inventory.reservedStock, 0)
+      : 0;
+
+    productData.inventory = inventory || null;
+
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -554,7 +608,7 @@ export const getProductBySlug = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      product,
+      product: productData,
     });
   } catch (error) {
     console.error("Get product error:", error);
@@ -730,10 +784,6 @@ export const updateProduct = async (req, res) => {
 
     if (SKU !== undefined) {
       product.SKU = SKU.trim().toUpperCase();
-    }
-
-    if (stock !== undefined) {
-      product.stock = Number(stock);
     }
 
     // --------------------------------
