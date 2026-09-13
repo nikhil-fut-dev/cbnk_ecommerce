@@ -1,7 +1,6 @@
 import Product from "../models/Product.js";
 import Category from "../models/Category.js";
 import Inventory from "../models/Inventory.js";
-import cloudinary from "../config/cloudinary.js";
 import {
   uploadToCloudinary,
   deleteFromCloudinary,
@@ -9,7 +8,6 @@ import {
 import { validateProductInput } from "../validators/productValidator.js";
 import {
   createOrSyncInventory,
-  getInventoryByProduct,
 } from "../services/inventoryService.js";
 
 const createSlug = (name) => {
@@ -488,18 +486,14 @@ export const getProducts = async (req, res) => {
     }
 
     // --------------------------------
-    // Database queries
+    // Fetch products
     // --------------------------------
 
     let products = await Product.find(filter)
       .populate("category", "name slug")
       .populate("subCategory", "name slug")
       .sort(sortOption)
-      .skip(skip)
-      .limit(perPage)
       .lean();
-
-    const totalProducts = await Product.countDocuments(filter);
 
     // Attach real inventory data
     const productIds = products.map((product) => product._id);
@@ -539,17 +533,28 @@ export const getProducts = async (req, res) => {
       };
     });
 
-    // inStock must use Inventory, not Product.stock
+    // --------------------------------
+    // Inventory stock filter
+    // --------------------------------
+
     if (inStock === "true") {
       products = products.filter((product) => product.availableStock > 0);
     }
 
+    // --------------------------------
+    // Pagination after inventory filter
+    // --------------------------------
+
+    const totalProducts = products.length;
+
     const totalPages = Math.ceil(totalProducts / perPage);
+
+    const paginatedProducts = products.slice(skip, skip + perPage);
 
     return res.status(200).json({
       success: true,
 
-      products,
+      products: paginatedProducts,
 
       pagination: {
         page: currentPage,
@@ -583,6 +588,13 @@ export const getProductBySlug = async (req, res) => {
       .populate("category", "name slug")
       .populate("subCategory", "name slug");
 
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
     const inventory = await Inventory.findOne({
       product: product._id,
     })
@@ -594,17 +606,14 @@ export const getProductBySlug = async (req, res) => {
     const productData = product.toObject();
 
     productData.availableStock = inventory
-      ? Math.max(inventory.totalStock - inventory.reservedStock, 0)
+      ? Math.max(
+          Number(inventory.totalStock || 0) -
+            Number(inventory.reservedStock || 0),
+          0,
+        )
       : 0;
 
     productData.inventory = inventory || null;
-
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        message: "Product not found",
-      });
-    }
 
     return res.status(200).json({
       success: true,
