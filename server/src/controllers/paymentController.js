@@ -174,6 +174,16 @@ export const verifyPayment = async (req, res) => {
       razorpayOrderId,
     });
 
+    if (
+      order.paymentDetails?.razorpayOrderId &&
+      order.paymentDetails.razorpayOrderId !== razorpayOrderId
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Razorpay order does not match this order",
+      });
+    }
+
     if (!payment) {
       return res.status(404).json({
         success: false,
@@ -289,10 +299,20 @@ export const razorpayWebhook = async (req, res) => {
      */
 
     if (event === "payment.captured") {
-      const razorpayPaymentId = payload.payment.entity.id;
+      const paymentEntity = req.body?.payload?.payment?.entity;
+
+      const razorpayPaymentId = paymentEntity?.id;
+      const razorpayOrderId = paymentEntity?.order_id;
+
+      if (!razorpayPaymentId || !razorpayOrderId) {
+        return res.status(400).json({
+          success: false,
+          message: "Payment capture data is incomplete",
+        });
+      }
 
       const payment = await Payment.findOne({
-        razorpayOrderId: payload.payment.entity.order_id,
+        razorpayOrderId,
       });
 
       if (!payment) {

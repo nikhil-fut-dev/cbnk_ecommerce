@@ -33,6 +33,13 @@ export const createOrder = async (req, res) => {
       });
     }
 
+    if (!mongoose.Types.ObjectId.isValid(addressId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid address ID",
+      });
+    }
+
     if (!["RAZORPAY", "COD"].includes(paymentMethod)) {
       return res.status(400).json({
         success: false,
@@ -399,8 +406,17 @@ export const getMyOrders = async (req, res) => {
 
 export const getOrderById = async (req, res) => {
   try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid order ID",
+      });
+    }
+
     const order = await Order.findOne({
-      _id: req.params.id,
+      _id: id,
       user: req.user._id,
     }).lean();
 

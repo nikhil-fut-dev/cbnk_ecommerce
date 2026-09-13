@@ -10,9 +10,9 @@ import { restoreStock } from "../services/inventoryService.js";
  * Allowed admin order status transitions
  */
 const STATUS_FLOW = {
-  PENDING: ["CONFIRMED", "CANCELLED"],
-  CONFIRMED: ["PROCESSING", "CANCELLED"],
-  PROCESSING: ["SHIPPED", "CANCELLED"],
+  PENDING: ["CONFIRMED"],
+  CONFIRMED: ["PROCESSING"],
+  PROCESSING: ["SHIPPED"],
   SHIPPED: ["OUT_FOR_DELIVERY"],
   OUT_FOR_DELIVERY: ["DELIVERED"],
   DELIVERED: [],
