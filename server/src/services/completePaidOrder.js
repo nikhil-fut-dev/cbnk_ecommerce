@@ -2,7 +2,6 @@ import Coupon from "../models/Coupon.js";
 import CouponUsage from "../models/CouponUsage.js";
 import Cart from "../models/Cart.js";
 import Order from "../models/Order.js";
-import Payment from "../models/Payment.js";
 
 import { deductStock } from "./inventoryService.js";
 
@@ -35,6 +34,28 @@ export const completePaidOrder = async ({
     throw new Error("Cancelled order cannot be completed");
   }
 
+  if (!payment) {
+    throw new Error("Payment record is required");
+  }
+
+  if (payment && payment.order.toString() !== transactionOrder._id.toString()) {
+    throw new Error("Payment does not belong to this order");
+  }
+
+  if (payment && payment.user.toString() !== transactionOrder.user.toString()) {
+    throw new Error("Payment does not belong to this user");
+  }
+
+  if (payment) {
+    if (Number(payment.amount) !== Number(transactionOrder.total)) {
+      throw new Error("Payment amount does not match order total");
+    }
+
+    if (payment.currency !== "INR") {
+      throw new Error("Invalid payment currency");
+    }
+  }
+
   /*
    * 1. Deduct inventory.
    */
@@ -60,76 +81,124 @@ export const completePaidOrder = async ({
       throw new Error("Coupon is no longer available");
     }
 
-    const now = new Date();
-
-    if (coupon.startDate && now < coupon.startDate) {
-      throw new Error("Coupon is not active");
-    }
-
-    if (coupon.expiryDate && now > coupon.expiryDate) {
-      throw new Error("Coupon has expired");
-    }
-
-    const userUsageCount = await CouponUsage.countDocuments({
+    /*
+     * Check whether this exact order has
+     * already consumed this coupon.
+     *
+     * This protects against duplicate payment
+     * verification / webhook processing.
+     */
+    const existingCouponUsage = await CouponUsage.findOne({
       coupon: coupon._id,
-      user: userId,
+      order: transactionOrder._id,
     }).session(session);
 
-    if (userUsageCount >= coupon.perUserLimit) {
-      throw new Error("You have reached the usage limit for this coupon");
-    }
+    if (!existingCouponUsage) {
+      const now = new Date();
 
-    /*
-     * Atomically increment global coupon usage.
-     */
-    const couponFilter = {
-      _id: coupon._id,
-      isActive: true,
-    };
+      if (coupon.startDate && now < coupon.startDate) {
+        throw new Error("Coupon is not active");
+      }
 
-    if (coupon.usageLimit !== null) {
-      couponFilter.usedCount = {
-        $lt: coupon.usageLimit,
+      if (coupon.expiryDate && now > coupon.expiryDate) {
+        throw new Error("Coupon has expired");
+      }
+
+      /*
+       * Check per-user usage limit.
+       */
+      const userUsageCount = await CouponUsage.countDocuments({
+        coupon: coupon._id,
+        user: userId,
+      }).session(session);
+
+      if (
+        coupon.perUserLimit !== null &&
+        userUsageCount >= coupon.perUserLimit
+      ) {
+        throw new Error("You have reached the usage limit for this coupon");
+      }
+
+      /*
+       * Atomically increment global coupon usage.
+       */
+      const couponFilter = {
+        _id: coupon._id,
+        isActive: true,
       };
-    }
 
-    const updatedCoupon = await Coupon.findOneAndUpdate(
-      couponFilter,
-      {
-        $inc: {
-          usedCount: 1,
-        },
-      },
-      {
-        new: true,
-        session,
-      },
-    );
+      if (coupon.usageLimit !== null) {
+        couponFilter.usedCount = {
+          $lt: coupon.usageLimit,
+        };
+      }
 
-    if (!updatedCoupon) {
-      throw new Error("Coupon usage limit has been reached");
-    }
-
-    /*
-     * Record this customer's coupon usage.
-     */
-    await CouponUsage.create(
-      [
+      const updatedCoupon = await Coupon.findOneAndUpdate(
+        couponFilter,
         {
-          coupon: coupon._id,
-          user: userId,
-          order: transactionOrder._id,
-          discountAmount: transactionOrder.coupon.discount,
+          $inc: {
+            usedCount: 1,
+          },
         },
-      ],
-      { session },
-    );
+        {
+          new: true,
+          session,
+        },
+      );
+
+      if (!updatedCoupon) {
+        throw new Error("Coupon usage limit has been reached");
+      }
+
+      /*
+       * Record this customer's coupon usage.
+       */
+      try {
+        await CouponUsage.create(
+          [
+            {
+              coupon: coupon._id,
+              user: userId,
+              order: transactionOrder._id,
+              discountAmount: transactionOrder.coupon.discount,
+            },
+          ],
+          { session },
+        );
+      } catch (error) {
+        /*
+         * The compound unique index on
+         * { coupon, order } protects against
+         * duplicate usage records.
+         */
+        if (error?.code === 11000) {
+          throw new Error("Coupon has already been applied to this order");
+        }
+
+        throw error;
+      }
+    }
   }
 
   /*
    * 3. Update payment.
    */
   if (payment) {
+    if (
+      payment.status === "REFUNDED" ||
+      payment.status === "PARTIALLY_REFUNDED"
+    ) {
+      throw new Error("Refunded payment cannot be completed");
+    }
+
+    if (
+      payment.razorpayPaymentId &&
+      razorpayPaymentId &&
+      payment.razorpayPaymentId !== razorpayPaymentId
+    ) {
+      throw new Error("Payment ID does not match existing payment record");
+    }
+
     payment.razorpayPaymentId =
       razorpayPaymentId || payment.razorpayPaymentId || null;
 

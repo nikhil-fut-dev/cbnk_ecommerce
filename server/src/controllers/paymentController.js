@@ -2,17 +2,11 @@ import mongoose from "mongoose";
 
 import Order from "../models/Order.js";
 import Payment from "../models/Payment.js";
-import Cart from "../models/Cart.js";
-import Coupon from "../models/Coupon.js";
+import razorpay from "../config/razorpay.js";
 
 import { createRazorpayOrder } from "../services/paymentService.js";
-
-import { deductStock } from "../services/inventoryService.js";
-
 import { verifyRazorpaySignature } from "../utils/razorpayUtils.js";
-
 import { verifyRazorpayWebhookSignature } from "../utils/razorpayWebhook.js";
-
 import { completePaidOrder } from "../services/completePaidOrder.js";
 
 export const createPaymentOrder = async (req, res) => {
@@ -61,8 +55,12 @@ export const createPaymentOrder = async (req, res) => {
 
     const existingPayment = await Payment.findOne({
       order: order._id,
-      status: "CREATED",
-    });
+      user: req.user._id,
+      provider: "RAZORPAY",
+      status: {
+        $in: ["CREATED", "AUTHORIZED"],
+      },
+    }).sort({ createdAt: -1 });
 
     if (existingPayment) {
       return res.status(200).json({
@@ -171,6 +169,8 @@ export const verifyPayment = async (req, res) => {
 
     const payment = await Payment.findOne({
       order: order._id,
+      user: req.user._id,
+      provider: "RAZORPAY",
       razorpayOrderId,
     });
 
@@ -188,6 +188,22 @@ export const verifyPayment = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Payment record not found",
+      });
+    }
+
+    const expectedAmount = Number(order.total);
+
+    if (Number(payment.amount) !== expectedAmount) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment amount does not match order total",
+      });
+    }
+
+    if (payment.currency !== "INR") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid payment currency",
       });
     }
 
@@ -215,14 +231,41 @@ export const verifyPayment = async (req, res) => {
     });
 
     if (!isValid) {
-      payment.status = "FAILED";
-      payment.failureReason = "Invalid payment signature";
-
-      await payment.save();
-
       return res.status(400).json({
         success: false,
         message: "Invalid payment signature",
+      });
+    }
+
+    const razorpayPayment = await razorpay.payments.fetch(razorpayPaymentId);
+
+    const expectedAmountInPaise = Math.round(order.total * 100);
+
+    if (razorpayPayment.order_id !== razorpayOrderId) {
+      return res.status(400).json({
+        success: false,
+        message: "Razorpay payment does not belong to this order",
+      });
+    }
+
+    if (Number(razorpayPayment.amount) !== expectedAmountInPaise) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment amount does not match order total",
+      });
+    }
+
+    if (razorpayPayment.currency !== "INR") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid payment currency",
+      });
+    }
+
+    if (razorpayPayment.status !== "captured") {
+      return res.status(400).json({
+        success: false,
+        message: "Payment has not been captured",
       });
     }
 
@@ -338,6 +381,23 @@ export const razorpayWebhook = async (req, res) => {
         });
       }
 
+      const webhookAmount = Number(paymentEntity?.amount || 0);
+      const webhookCurrency = paymentEntity?.currency;
+
+      if (webhookCurrency !== "INR") {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid payment currency",
+        });
+      }
+
+      if (webhookAmount !== Math.round(order.total * 100)) {
+        return res.status(400).json({
+          success: false,
+          message: "Webhook payment amount does not match order total",
+        });
+      }
+
       const eventId =
         req.headers["x-razorpay-event-id"] ||
         `payment.captured:${razorpayPaymentId}`;
@@ -438,7 +498,11 @@ export const razorpayWebhook = async (req, res) => {
         });
       }
 
-      if (payment.webhookEvents.includes(event)) {
+      const eventId =
+        req.headers["x-razorpay-event-id"] ||
+        `payment.failed:${razorpayPaymentId || razorpayOrderId}`;
+
+      if (payment.webhookEvents.includes(eventId)) {
         return res.status(200).json({
           success: true,
           message: "Payment failure webhook already processed",
@@ -451,7 +515,7 @@ export const razorpayWebhook = async (req, res) => {
 
       payment.failureReason = failureReason;
 
-      payment.webhookEvents.push(event);
+      payment.webhookEvents.push(eventId);
 
       await payment.save();
 
@@ -460,7 +524,7 @@ export const razorpayWebhook = async (req, res) => {
           paymentStatus: "FAILED",
         },
         $addToSet: {
-          "paymentDetails.webhookEvents": event,
+          "paymentDetails.webhookEvents": eventId,
         },
       });
 
@@ -492,28 +556,36 @@ export const razorpayWebhook = async (req, res) => {
         });
       }
 
-      if (payment.webhookEvents.includes(event)) {
+      const eventId =
+        req.headers["x-razorpay-event-id"] || `${event}:${refundEntity?.id}`;
+
+      if (payment.webhookEvents.includes(eventId)) {
         return res.status(200).json({
           success: true,
           message: "Refund webhook already processed",
         });
       }
 
-      payment.refundAmount = refundAmount;
+      const newRefundAmount = Number(payment.refundAmount || 0) + refundAmount;
+
+      if (newRefundAmount > payment.amount) {
+        return res.status(400).json({
+          success: false,
+          message: "Refund amount exceeds payment amount",
+        });
+      }
+
+      payment.refundAmount = newRefundAmount;
 
       payment.refundId = refundEntity?.id || null;
 
-      /*
-       * If refund equals the complete payment
-       * amount, mark it fully refunded.
-       */
-      if (refundAmount >= payment.amount) {
+      if (newRefundAmount >= payment.amount) {
         payment.status = "REFUNDED";
       } else {
         payment.status = "PARTIALLY_REFUNDED";
       }
 
-      payment.webhookEvents.push(event);
+      payment.webhookEvents.push(eventId);
 
       await payment.save();
 
@@ -523,7 +595,7 @@ export const razorpayWebhook = async (req, res) => {
             payment.status === "REFUNDED" ? "REFUNDED" : "PARTIALLY_REFUNDED",
         },
         $addToSet: {
-          "paymentDetails.webhookEvents": event,
+          "paymentDetails.webhookEvents": eventId,
         },
       });
 

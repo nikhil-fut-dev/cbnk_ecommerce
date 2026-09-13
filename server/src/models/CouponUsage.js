@@ -33,8 +33,22 @@ const couponUsageSchema = new mongoose.Schema(
   },
 );
 
-couponUsageSchema.index({ coupon: 1, user: 1, createdAt: -1 });
-couponUsageSchema.index({ order: 1 });
+couponUsageSchema.index({
+  coupon: 1,
+  user: 1,
+  createdAt: -1,
+});
+
+couponUsageSchema.index(
+  {
+    coupon: 1,
+    order: 1,
+  },
+  {
+    unique: true,
+    sparse: true,
+  },
+);
 
 const CouponUsage = mongoose.model("CouponUsage", couponUsageSchema);
 
