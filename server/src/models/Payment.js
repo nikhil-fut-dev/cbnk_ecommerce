@@ -33,6 +33,8 @@ const paymentSchema = new mongoose.Schema(
     razorpayPaymentId: {
       type: String,
       default: null,
+      unique: true,
+      sparse: true,
       index: true,
     },
 
@@ -51,6 +53,7 @@ const paymentSchema = new mongoose.Schema(
       type: String,
       default: "INR",
       uppercase: true,
+      enum: ["INR"],
     },
 
     status: {

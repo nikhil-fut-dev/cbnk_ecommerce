@@ -5,6 +5,14 @@ export const verifyRazorpayWebhookSignature = ({ rawBody, signature }) => {
     return false;
   }
 
+  if (!process.env.RAZORPAY_WEBHOOK_SECRET) {
+    return false;
+  }
+
+  if (typeof signature !== "string") {
+    return false;
+  }
+
   const expectedSignature = crypto
     .createHmac("sha256", process.env.RAZORPAY_WEBHOOK_SECRET)
     .update(rawBody)
