@@ -393,7 +393,12 @@ export const restoreStock = async ({
     const result = await Inventory.findOneAndUpdate(
       {
         product: productId,
-        "variants.variant": variantId,
+        variants: {
+          $elemMatch: {
+            variant: variantId,
+            soldStock: { $gte: quantity },
+          },
+        },
       },
       {
         $inc: {
@@ -410,7 +415,9 @@ export const restoreStock = async ({
     );
 
     if (!result) {
-      throw new Error("Inventory variant not found");
+      throw new Error(
+        "Inventory variant not found or invalid restore quantity",
+      );
     }
 
     return result;

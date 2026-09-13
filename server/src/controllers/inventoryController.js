@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
 import Inventory from "../models/Inventory.js";
+import Product from "../models/Product.js";
 
 import {
   getInventoryByProduct,
@@ -20,9 +21,25 @@ export const getProductInventory = async (req, res) => {
       data: inventory,
     });
   } catch (error) {
-    return res.status(404).json({
+    console.error("Get product inventory error:", error);
+
+    if (error.message === "Invalid product ID") {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (error.message === "Inventory not found") {
+      return res.status(404).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    return res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Failed to fetch product inventory",
     });
   }
 };
@@ -240,6 +257,24 @@ export const restockProduct = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Inventory not found",
+      });
+    }
+
+    const product = await Product.findOne({
+      _id: productId,
+    });
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found",
+      });
+    }
+
+    if (product.isDeleted) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot restock a deleted product",
       });
     }
 
