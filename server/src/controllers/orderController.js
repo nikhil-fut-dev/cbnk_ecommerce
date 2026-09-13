@@ -6,13 +6,25 @@ import Address from "../models/Address.js";
 import Product from "../models/Product.js";
 
 import { generateOrderNumber } from "../utils/generateOrderNumber.js";
-import { calculateOrderPricing } from "../utils/calculatePricing.js";
+import { calculateOrderPricing } from "../services/calculatePricing.js";
+import { refundPayment } from "../services/refundPayment.js";
+import { checkStock, restoreStock } from "../services/inventoryService.js";
 
 export const createOrder = async (req, res) => {
   const session = await mongoose.startSession();
 
   try {
-    const { addressId, paymentMethod = "RAZORPAY" } = req.body;
+    const {
+      addressId,
+      paymentMethod = "RAZORPAY",
+      couponCode = null,
+    } = req.body;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Basic Validation
+    |--------------------------------------------------------------------------
+    */
 
     if (!addressId) {
       return res.status(400).json({
@@ -28,6 +40,12 @@ export const createOrder = async (req, res) => {
       });
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Validate Address Ownership
+    |--------------------------------------------------------------------------
+    */
+
     const address = await Address.findOne({
       _id: addressId,
       user: req.user._id,
@@ -39,6 +57,12 @@ export const createOrder = async (req, res) => {
         message: "Shipping address not found",
       });
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Get Customer Cart
+    |--------------------------------------------------------------------------
+    */
 
     const cart = await Cart.findOne({
       user: req.user._id,
@@ -52,11 +76,15 @@ export const createOrder = async (req, res) => {
     }
 
     /*
-     * Re-check every cart item against the current
-     * database product before creating the order.
-     */
+    |--------------------------------------------------------------------------
+    | Re-validate Cart
+    |
+    | Never trust price/stock coming from the client.
+    | Everything is fetched again from the database.
+    |--------------------------------------------------------------------------
+    */
+
     const orderItems = [];
-    let subtotal = 0;
 
     for (const cartItem of cart.items) {
       const product = await Product.findOne({
@@ -72,10 +100,15 @@ export const createOrder = async (req, res) => {
         });
       }
 
-      let availableStock = product.stock;
       let selectedPrice = product.price;
       let selectedSKU = product.SKU;
       let selectedImage = product.images?.[0]?.url || "";
+
+      /*
+|--------------------------------------------------------------------------
+| Variant Validation
+|--------------------------------------------------------------------------
+*/
 
       if (cartItem.variant) {
         const variant = product.variants.id(cartItem.variant);
@@ -87,8 +120,6 @@ export const createOrder = async (req, res) => {
           });
         }
 
-        availableStock = variant.stock;
-
         selectedPrice = variant.price !== null ? variant.price : product.price;
 
         selectedSKU = variant.SKU;
@@ -96,38 +127,87 @@ export const createOrder = async (req, res) => {
         selectedImage = variant.image?.url || product.images?.[0]?.url || "";
       }
 
-      if (cartItem.quantity > availableStock) {
+      /*
+      |--------------------------------------------------------------------------
+      | Inventory Validation
+      |--------------------------------------------------------------------------
+      |
+      | Product.stock is NOT trusted for checkout.
+      | Inventory is the source of truth.
+      |--------------------------------------------------------------------------
+      */
+
+      const stockCheck = await checkStock({
+        productId: product._id,
+        variantId: cartItem.variant || null,
+        quantity: cartItem.quantity,
+      });
+
+      if (!stockCheck.available) {
         return res.status(400).json({
           success: false,
           message: `Insufficient stock for ${product.name}`,
+          data: {
+            availableStock: stockCheck.availableStock,
+            requestedQuantity: cartItem.quantity,
+          },
         });
       }
 
-      const itemTotal = selectedPrice * cartItem.quantity;
+      /*
+      |--------------------------------------------------------------------------
+      | Order Item Snapshot
+      |--------------------------------------------------------------------------
+      */
 
-      subtotal += itemTotal;
+      const itemTotal = selectedPrice * cartItem.quantity;
 
       orderItems.push({
         product: product._id,
-        variant: cartItem.variant,
+        variant: cartItem.variant || null,
+
         name: product.name,
         slug: product.slug,
+
         SKU: selectedSKU,
         image: selectedImage,
-        size: cartItem.size,
-        color: cartItem.color,
+
+        size: cartItem.size || "",
+        color: cartItem.color || "",
+
         quantity: cartItem.quantity,
+
+        // Important:
+        // Price is taken from database, never from client.
         price: selectedPrice,
         total: itemTotal,
+
+        // Required for category-based coupons.
+        category: product.category,
       });
     }
 
-    const pricing = calculateOrderPricing({
-      subtotal,
-      coupon: null,
+    /*
+    |--------------------------------------------------------------------------
+    | Calculate Final Checkout Pricing
+    |--------------------------------------------------------------------------
+    */
+
+    const pricing = await calculateOrderPricing({
+      items: orderItems,
+      userId: req.user._id,
+      couponCode,
     });
 
-    const { discount, shippingFee, tax, total } = pricing;
+    const { subtotal, discount, shippingFee, tax, total, coupon } = pricing;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Shipping Address Snapshot
+    |
+    | Address may change later, so order stores its own copy.
+    |--------------------------------------------------------------------------
+    */
 
     const shippingAddress = {
       fullName: address.fullName,
@@ -141,53 +221,130 @@ export const createOrder = async (req, res) => {
       country: address.country,
     };
 
+    /*
+    |--------------------------------------------------------------------------
+    | Start Transaction
+    |--------------------------------------------------------------------------
+    */
+
     session.startTransaction();
 
     /*
-     * Create order first.
-     *
-     * Inventory deduction is intentionally handled
-     * in the inventory/payment stage to avoid reducing
-     * stock for an unpaid Razorpay order.
-     */
+    |--------------------------------------------------------------------------
+    | Create Order
+    |--------------------------------------------------------------------------
+    */
+
     const [order] = await Order.create(
       [
         {
           orderNumber: generateOrderNumber(),
+
           user: req.user._id,
+
           items: orderItems,
+
           shippingAddress,
+
           subtotal,
           discount,
           shippingFee,
           tax,
           total,
+
+          coupon: coupon
+            ? {
+                code: coupon.code,
+                discount: discount,
+              }
+            : null,
+
           paymentMethod,
-          paymentStatus: paymentMethod === "COD" ? "PENDING" : "PENDING",
+
+          paymentStatus: "PENDING",
+
           orderStatus: "PENDING",
         },
       ],
       { session },
     );
 
+    /*
+    |--------------------------------------------------------------------------
+    | Commit
+    |--------------------------------------------------------------------------
+    */
+
     await session.commitTransaction();
+
+    /*
+    |--------------------------------------------------------------------------
+    | Response
+    |--------------------------------------------------------------------------
+    */
 
     return res.status(201).json({
       success: true,
       message: "Order created successfully",
-      order,
+
+      data: {
+        order,
+        pricing: {
+          subtotal,
+          discount,
+          shippingFee,
+          tax,
+          total,
+        },
+
+        coupon: coupon
+          ? {
+              code: coupon.code,
+              discount,
+            }
+          : null,
+      },
     });
   } catch (error) {
     await session.abortTransaction();
 
-    console.error("Create order error:", error);
+    console.error("Create order error:", error.message);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Coupon / Validation Errors
+    |--------------------------------------------------------------------------
+    */
+
+    const clientErrors = [
+      "Invalid or inactive coupon",
+      "Coupon is not active yet",
+      "Coupon has expired",
+      "Coupon usage limit reached",
+      "Minimum order value",
+      "Maximum order value",
+      "You have already reached",
+      "Coupon is not applicable",
+      "Cart is empty",
+    ];
+
+    const isClientError = clientErrors.some((message) =>
+      error.message.includes(message),
+    );
+
+    if (isClientError) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
 
     return res.status(500).json({
       success: false,
       message: "Failed to create order",
     });
   } finally {
-    session.endSession();
+    await session.endSession();
   }
 };
 
@@ -269,51 +426,84 @@ export const getOrderById = async (req, res) => {
 };
 
 export const cancelOrder = async (req, res) => {
+  const session = await mongoose.startSession();
+
   try {
-    const { reason = "Customer requested cancellation" } = req.body;
+    const { id } = req.params;
+    const { reason = "Order cancelled by customer" } = req.body;
 
-    const order = await Order.findOne({
-      _id: req.params.id,
-      user: req.user._id,
+    let cancelledOrder;
+
+    await session.withTransaction(async () => {
+      const order = await Order.findOne({
+        _id: id,
+        user: req.user._id,
+      }).session(session);
+
+      if (!order) {
+        throw new Error("Order not found");
+      }
+
+      const cancellableStatuses = ["PENDING", "CONFIRMED", "PROCESSING"];
+
+      if (!cancellableStatuses.includes(order.orderStatus)) {
+        throw new Error("This order cannot be cancelled at this stage");
+      }
+
+      if (order.orderStatus === "CANCELLED") {
+        throw new Error("Order is already cancelled");
+      }
+
+      // Paid Razorpay order → refund first
+      if (
+        order.paymentMethod === "RAZORPAY" &&
+        order.paymentStatus === "PAID"
+      ) {
+        await refundPayment({
+          orderId: order._id,
+          userId: req.user._id,
+          reason,
+          session,
+        });
+      }
+
+      // Restore inventory only when stock had actually been deducted
+      if (order.paymentStatus === "PAID") {
+        for (const item of order.items) {
+          await restoreStock({
+            productId: item.product,
+            variantId: item.variant || null,
+            quantity: item.quantity,
+            session,
+          });
+        }
+      }
+
+      order.orderStatus = "CANCELLED";
+      order.cancellation = {
+        reason,
+        cancelledAt: new Date(),
+        cancelledBy: "CUSTOMER",
+      };
+
+      cancelledOrder = await order.save({ session });
     });
-
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: "Order not found",
-      });
-    }
-
-    const cancellableStatuses = ["PENDING", "CONFIRMED", "PROCESSING"];
-
-    if (!cancellableStatuses.includes(order.orderStatus)) {
-      return res.status(400).json({
-        success: false,
-        message: "This order can no longer be cancelled",
-      });
-    }
-
-    order.orderStatus = "CANCELLED";
-
-    order.cancellation = {
-      reason: reason.trim(),
-      cancelledAt: new Date(),
-      cancelledBy: req.user._id,
-    };
-
-    await order.save();
 
     return res.status(200).json({
       success: true,
       message: "Order cancelled successfully",
-      order,
+      data: {
+        order: cancelledOrder,
+      },
     });
   } catch (error) {
     console.error("Cancel order error:", error);
 
-    return res.status(500).json({
+    return res.status(400).json({
       success: false,
-      message: "Failed to cancel order",
+      message: error.message || "Failed to cancel order",
     });
+  } finally {
+    await session.endSession();
   }
 };

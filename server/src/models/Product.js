@@ -238,7 +238,7 @@ const productSchema = new mongoose.Schema(
       index: true,
     },
 
-    isNew: {
+    isNewArrival: {
       type: Boolean,
       default: true,
       index: true,
@@ -267,20 +267,42 @@ const productSchema = new mongoose.Schema(
   },
 );
 
-productSchema.index({ slug: 1 }, { unique: true });
-productSchema.index({ SKU: 1 }, { unique: true });
+// --------------------------------
+// Compound Indexes
+// --------------------------------
 
-productSchema.index({ category: 1, isActive: 1 });
-productSchema.index({ subCategory: 1, isActive: 1 });
+productSchema.index({
+  category: 1,
+  isActive: 1,
+});
 
-productSchema.index({ price: 1 });
-productSchema.index({ rating: -1 });
+productSchema.index({
+  subCategory: 1,
+  isActive: 1,
+});
 
-productSchema.index({ isFeatured: 1, isActive: 1 });
-productSchema.index({ isNew: 1, isActive: 1 });
-productSchema.index({ isBestSeller: 1, isActive: 1 });
+productSchema.index({
+  isFeatured: 1,
+  isActive: 1,
+});
 
-productSchema.index({ createdAt: -1 });
+productSchema.index({
+  isNewArrival: 1,
+  isActive: 1,
+});
+
+productSchema.index({
+  isBestSeller: 1,
+  isActive: 1,
+});
+
+productSchema.index({
+  createdAt: -1,
+});
+
+// --------------------------------
+// Product Model
+// --------------------------------
 
 const Product = mongoose.model("Product", productSchema);
 

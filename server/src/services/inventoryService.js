@@ -24,6 +24,10 @@ export const getInventoryByProduct = async (productId) => {
 
 /**
  * Create or synchronize inventory from product
+ *
+ * Important:
+ * Existing stock/sold/reserved values are preserved.
+ * Product updates must never reset soldStock.
  */
 export const createOrSyncInventory = async (productId) => {
   if (!mongoose.Types.ObjectId.isValid(productId)) {
@@ -40,40 +44,106 @@ export const createOrSyncInventory = async (productId) => {
     product: product._id,
   });
 
-  const variants = product.variants.map((variant) => ({
-    variant: variant._id,
-    SKU: variant.SKU,
-    size: variant.size || "",
-    color: variant.color || "",
-    stock: variant.stock || 0,
-    reservedStock: 0,
-    soldStock: 0,
-    lowStockThreshold: 5,
-  }));
-
-  const totalVariantStock = variants.reduce(
-    (total, variant) => total + variant.stock,
-    0,
-  );
-
+  /*
+   * Create inventory for the first time.
+   */
   if (!inventory) {
+    const variants = product.variants.map((variant) => ({
+      variant: variant._id,
+      SKU: variant.SKU,
+      size: variant.size || "",
+      color: variant.color || "",
+      stock: Number(variant.stock || 0),
+      reservedStock: 0,
+      soldStock: 0,
+      lowStockThreshold: 5,
+    }));
+
+    const totalVariantStock = variants.reduce(
+      (total, variant) => total + variant.stock,
+      0,
+    );
+
     inventory = await Inventory.create({
       product: product._id,
-      totalStock: variants.length > 0 ? totalVariantStock : product.stock || 0,
+      totalStock:
+        variants.length > 0 ? totalVariantStock : Number(product.stock || 0),
       reservedStock: 0,
       soldStock: 0,
       lowStockThreshold: 5,
       variants,
       lastRestockedAt: new Date(),
     });
-  } else {
-    inventory.totalStock =
-      variants.length > 0 ? totalVariantStock : product.stock || 0;
 
-    inventory.variants = variants;
-
-    await inventory.save();
+    return inventory;
   }
+
+  /*
+   * Existing inventory:
+   * Preserve current stock/sold/reserved values.
+   *
+   * New product variants are added.
+   * Removed product variants are removed from inventory.
+   * Existing variant stock is NOT overwritten.
+   */
+  const existingVariants = inventory.variants || [];
+
+  const existingVariantMap = new Map(
+    existingVariants.map((item) => [item.variant?.toString(), item]),
+  );
+
+  const syncedVariants = product.variants.map((productVariant) => {
+    const variantId = productVariant._id.toString();
+
+    const existingVariant = existingVariantMap.get(variantId);
+
+    if (existingVariant) {
+      existingVariant.SKU = productVariant.SKU;
+      existingVariant.size = productVariant.size || "";
+      existingVariant.color = productVariant.color || "";
+
+      return existingVariant;
+    }
+
+    /*
+     * New variant.
+     */
+    return {
+      variant: productVariant._id,
+      SKU: productVariant.SKU,
+      size: productVariant.size || "",
+      color: productVariant.color || "",
+      stock: Number(productVariant.stock || 0),
+      reservedStock: 0,
+      soldStock: 0,
+      lowStockThreshold: 5,
+    };
+  });
+
+  inventory.variants = syncedVariants;
+
+  /*
+   * For variant products, totalStock should be calculated
+   * from inventory variants.
+   */
+  if (syncedVariants.length > 0) {
+    inventory.totalStock = syncedVariants.reduce(
+      (total, variant) => total + Number(variant.stock || 0),
+      0,
+    );
+
+    inventory.reservedStock = syncedVariants.reduce(
+      (total, variant) => total + Number(variant.reservedStock || 0),
+      0,
+    );
+
+    inventory.soldStock = syncedVariants.reduce(
+      (total, variant) => total + Number(variant.soldStock || 0),
+      0,
+    );
+  }
+
+  await inventory.save();
 
   return inventory;
 };
@@ -86,7 +156,7 @@ export const checkStock = async ({ productId, variantId = null, quantity }) => {
     throw new Error("Invalid product ID");
   }
 
-  if (!quantity || quantity < 1) {
+  if (!Number.isInteger(quantity) || quantity < 1) {
     throw new Error("Quantity must be at least 1");
   }
 
@@ -98,7 +168,14 @@ export const checkStock = async ({ productId, variantId = null, quantity }) => {
     throw new Error("Inventory not found");
   }
 
+  /*
+   * Variant stock
+   */
   if (variantId) {
+    if (!mongoose.Types.ObjectId.isValid(variantId)) {
+      throw new Error("Invalid variant ID");
+    }
+
     const variant = inventory.variants.find(
       (item) => item.variant?.toString() === variantId.toString(),
     );
@@ -107,7 +184,10 @@ export const checkStock = async ({ productId, variantId = null, quantity }) => {
       throw new Error("Inventory variant not found");
     }
 
-    const availableStock = variant.stock - variant.reservedStock;
+    const availableStock = Math.max(
+      0,
+      Number(variant.stock || 0) - Number(variant.reservedStock || 0),
+    );
 
     return {
       available: availableStock >= quantity,
@@ -115,7 +195,13 @@ export const checkStock = async ({ productId, variantId = null, quantity }) => {
     };
   }
 
-  const availableStock = inventory.totalStock - inventory.reservedStock;
+  /*
+   * Simple product stock
+   */
+  const availableStock = Math.max(
+    0,
+    Number(inventory.totalStock || 0) - Number(inventory.reservedStock || 0),
+  );
 
   return {
     available: availableStock >= quantity,
@@ -136,30 +222,91 @@ export const deductStock = async ({
     throw new Error("Invalid product ID");
   }
 
-  if (!quantity || quantity < 1) {
+  if (!Number.isInteger(quantity) || quantity < 1) {
     throw new Error("Quantity must be at least 1");
   }
 
+  /*
+   * Variant product
+   */
   if (variantId) {
     if (!mongoose.Types.ObjectId.isValid(variantId)) {
       throw new Error("Invalid variant ID");
     }
 
+    /*
+     * The $expr checks the matching variant's:
+     *
+     * stock - reservedStock >= quantity
+     *
+     * before performing the atomic update.
+     */
     const result = await Inventory.findOneAndUpdate(
       {
         product: productId,
+
         variants: {
           $elemMatch: {
             variant: variantId,
-            $expr: {
-              $gte: [
+          },
+        },
+
+        $expr: {
+          $gte: [
+            {
+              $subtract: [
                 {
-                  $subtract: ["$$this.stock", "$$this.reservedStock"],
+                  $let: {
+                    vars: {
+                      matchingVariant: {
+                        $arrayElemAt: [
+                          {
+                            $filter: {
+                              input: "$variants",
+                              as: "item",
+                              cond: {
+                                $eq: [
+                                  "$$item.variant",
+                                  new mongoose.Types.ObjectId(variantId),
+                                ],
+                              },
+                            },
+                          },
+                          0,
+                        ],
+                      },
+                    },
+                    in: "$$matchingVariant.stock",
+                  },
                 },
-                quantity,
+                {
+                  $let: {
+                    vars: {
+                      matchingVariant: {
+                        $arrayElemAt: [
+                          {
+                            $filter: {
+                              input: "$variants",
+                              as: "item",
+                              cond: {
+                                $eq: [
+                                  "$$item.variant",
+                                  new mongoose.Types.ObjectId(variantId),
+                                ],
+                              },
+                            },
+                          },
+                          0,
+                        ],
+                      },
+                    },
+                    in: "$$matchingVariant.reservedStock",
+                  },
+                },
               ],
             },
-          },
+            quantity,
+          ],
         },
       },
       {
@@ -183,9 +330,13 @@ export const deductStock = async ({
     return result;
   }
 
+  /*
+   * Simple product
+   */
   const result = await Inventory.findOneAndUpdate(
     {
       product: productId,
+
       $expr: {
         $gte: [
           {
@@ -227,10 +378,13 @@ export const restoreStock = async ({
     throw new Error("Invalid product ID");
   }
 
-  if (!quantity || quantity < 1) {
+  if (!Number.isInteger(quantity) || quantity < 1) {
     throw new Error("Quantity must be at least 1");
   }
 
+  /*
+   * Variant product
+   */
   if (variantId) {
     if (!mongoose.Types.ObjectId.isValid(variantId)) {
       throw new Error("Invalid variant ID");
@@ -262,9 +416,15 @@ export const restoreStock = async ({
     return result;
   }
 
+  /*
+   * Simple product
+   */
   const result = await Inventory.findOneAndUpdate(
     {
       product: productId,
+      soldStock: {
+        $gte: quantity,
+      },
     },
     {
       $inc: {
@@ -279,7 +439,7 @@ export const restoreStock = async ({
   );
 
   if (!result) {
-    throw new Error("Inventory not found");
+    throw new Error("Inventory not found or invalid restore quantity");
   }
 
   return result;

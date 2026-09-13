@@ -16,6 +16,8 @@ import orderRoutes from "./routes/orderRoutes.js";
 import couponRoutes from "./routes/couponRoutes.js";
 import inventoryRoutes from "./routes/inventoryRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
+import reviewRoutes from "./routes/reviewRoutes.js";
+import adminOrderRoutes from "./routes/adminOrderRoutes.js";
 
 const app = express();
 
@@ -50,7 +52,16 @@ const apiLimiter = rateLimit({
 app.use("/api", apiLimiter);
 
 // Body parser
-app.use(express.json({ limit: "10mb" }));
+app.use(
+  express.json({
+    limit: "10mb",
+    verify: (req, res, buffer) => {
+      if (req.originalUrl === "/api/v1/payments/razorpay/webhook") {
+        req.rawBody = buffer;
+      }
+    },
+  }),
+);
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Cookies
@@ -68,6 +79,8 @@ app.use("/api/v1/orders", orderRoutes);
 app.use("/api/v1/coupons", couponRoutes);
 app.use("/api/v1/inventory", inventoryRoutes);
 app.use("/api/v1/payments", paymentRoutes);
+app.use("/api/v1/reviews", reviewRoutes);
+app.use("/api/v1/admin/orders", adminOrderRoutes);
 
 // Health
 app.get("/api/v1/health", (req, res) => {

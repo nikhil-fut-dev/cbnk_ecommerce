@@ -8,6 +8,12 @@ const orderItemSchema = new mongoose.Schema(
       required: true,
     },
 
+    category: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
+      default: null,
+    },
+
     variant: {
       type: mongoose.Schema.Types.ObjectId,
       default: null,
@@ -250,6 +256,11 @@ const orderSchema = new mongoose.Schema(
       razorpaySignature: {
         type: String,
         default: "",
+      },
+
+      webhookEvents: {
+        type: [String],
+        default: [],
       },
     },
 

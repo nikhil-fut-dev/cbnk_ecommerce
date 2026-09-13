@@ -19,3 +19,6 @@ const upload = multer({
 });
 
 export const uploadProductImages = upload.array("images", 10);
+
+// Category ke liye single image
+export const uploadCategoryImage = upload.single("image");

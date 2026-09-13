@@ -3,12 +3,17 @@ import mongoose from "mongoose";
 import Order from "../models/Order.js";
 import Payment from "../models/Payment.js";
 import Cart from "../models/Cart.js";
+import Coupon from "../models/Coupon.js";
 
 import { createRazorpayOrder } from "../services/paymentService.js";
 
 import { deductStock } from "../services/inventoryService.js";
 
 import { verifyRazorpaySignature } from "../utils/razorpayUtils.js";
+
+import { verifyRazorpayWebhookSignature } from "../utils/razorpayWebhook.js";
+
+import { completePaidOrder } from "../services/completePaidOrder.js";
 
 export const createPaymentOrder = async (req, res) => {
   try {
@@ -212,77 +217,22 @@ export const verifyPayment = async (req, res) => {
     }
 
     await session.withTransaction(async () => {
-      const transactionOrder = await Order.findOne({
-        _id: order._id,
-        user: req.user._id,
-      }).session(session);
-
-      if (!transactionOrder) {
-        throw new Error("Order not found");
-      }
-
-      if (transactionOrder.paymentStatus === "PAID") {
-        return;
-      }
-
-      /*
-       * Deduct inventory for every order item.
-       */
-      for (const item of transactionOrder.items) {
-        await deductStock({
-          productId: item.product,
-          variantId: item.variant || null,
-          quantity: item.quantity,
-          session,
-        });
-      }
-
-      /*
-       * Update payment.
-       */
-      payment.razorpayPaymentId = razorpayPaymentId;
-
-      payment.razorpaySignature = razorpaySignature;
-
-      payment.status = "CAPTURED";
-      payment.paidAt = new Date();
-
-      await payment.save({
+      const transactionPayment = await Payment.findById(payment._id).session(
         session,
-      });
-
-      /*
-       * Update order.
-       */
-      transactionOrder.paymentStatus = "PAID";
-
-      transactionOrder.orderStatus = "CONFIRMED";
-
-      transactionOrder.paymentDetails.razorpayPaymentId = razorpayPaymentId;
-
-      transactionOrder.paymentDetails.razorpaySignature = razorpaySignature;
-
-      await transactionOrder.save({
-        session,
-      });
-
-      /*
-       * Clear user's cart only after
-       * successful payment + stock deduction.
-       */
-      await Cart.findOneAndUpdate(
-        {
-          user: req.user._id,
-        },
-        {
-          $set: {
-            items: [],
-          },
-        },
-        {
-          session,
-        },
       );
+
+      if (!transactionPayment) {
+        throw new Error("Payment record not found");
+      }
+
+      await completePaidOrder({
+        orderId: order._id,
+        userId: req.user._id,
+        payment: transactionPayment,
+        razorpayPaymentId,
+        razorpaySignature,
+        session,
+      });
     });
 
     return res.status(200).json({
@@ -304,5 +254,272 @@ export const verifyPayment = async (req, res) => {
     });
   } finally {
     await session.endSession();
+  }
+};
+
+export const razorpayWebhook = async (req, res) => {
+  console.log("🔔 Razorpay webhook received");
+  try {
+    const signature = req.headers["x-razorpay-signature"];
+
+    const isValid = verifyRazorpayWebhookSignature({
+      rawBody: req.rawBody,
+      signature,
+    });
+
+    if (!isValid) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid webhook signature",
+      });
+    }
+
+    const event = req.body?.event;
+
+    if (!event) {
+      return res.status(400).json({
+        success: false,
+        message: "Webhook event is missing",
+      });
+    }
+
+    /*
+     * Razorpay sends different payload structures
+     * for different events.
+     */
+
+    if (event === "payment.captured") {
+      const razorpayPaymentId = payload.payment.entity.id;
+
+      const payment = await Payment.findOne({
+        razorpayOrderId: payload.payment.entity.order_id,
+      });
+
+      if (!payment) {
+        return res.status(200).json({
+          success: true,
+          message: "Payment record not found, webhook acknowledged",
+        });
+      }
+
+      if (payment.status === "CAPTURED") {
+        return res.status(200).json({
+          success: true,
+          message: "Payment already captured",
+        });
+      }
+
+      const order = await Order.findById(payment.order);
+
+      if (!order) {
+        return res.status(200).json({
+          success: true,
+          message: "Order not found, webhook acknowledged",
+        });
+      }
+
+      const eventId =
+        req.headers["x-razorpay-event-id"] ||
+        `payment.captured:${razorpayPaymentId}`;
+
+      if (payment.webhookEvents.includes(eventId)) {
+        return res.status(200).json({
+          success: true,
+          message: "Webhook already processed",
+        });
+      }
+
+      const session = await mongoose.startSession();
+
+      try {
+        await session.withTransaction(async () => {
+          const transactionPayment = await Payment.findById(
+            payment._id,
+          ).session(session);
+
+          const transactionOrder = await Order.findById(order._id).session(
+            session,
+          );
+
+          if (!transactionPayment || !transactionOrder) {
+            throw new Error("Payment or order not found");
+          }
+
+          await completePaidOrder({
+            orderId: transactionOrder._id,
+            userId: transactionOrder.user,
+            payment: transactionPayment,
+            razorpayPaymentId,
+            session,
+          });
+
+          transactionPayment.webhookEvents.push(eventId);
+
+          await transactionPayment.save({ session });
+
+          transactionOrder.paymentDetails =
+            transactionOrder.paymentDetails || {};
+
+          transactionOrder.paymentDetails.webhookEvents =
+            transactionOrder.paymentDetails.webhookEvents || [];
+
+          if (
+            !transactionOrder.paymentDetails.webhookEvents.includes(eventId)
+          ) {
+            transactionOrder.paymentDetails.webhookEvents.push(eventId);
+          }
+
+          await transactionOrder.save({ session });
+        });
+
+        return res.status(200).json({
+          success: true,
+          message: "Payment captured and order completed",
+        });
+      } catch (error) {
+        console.error("Payment captured webhook error:", error);
+
+        return res.status(500).json({
+          success: false,
+          message: error.message || "Webhook processing failed",
+        });
+      } finally {
+        await session.endSession();
+      }
+    }
+
+    if (event === "payment.failed") {
+      const paymentEntity = req.body?.payload?.payment?.entity;
+
+      const razorpayPaymentId = paymentEntity?.id;
+
+      const razorpayOrderId = paymentEntity?.order_id;
+
+      const failureReason =
+        paymentEntity?.error_description ||
+        paymentEntity?.error_reason ||
+        "Payment failed";
+
+      if (!razorpayOrderId) {
+        return res.status(400).json({
+          success: false,
+          message: "Payment failure data is incomplete",
+        });
+      }
+
+      const payment = await Payment.findOne({
+        razorpayOrderId,
+      });
+
+      if (!payment) {
+        return res.status(200).json({
+          success: true,
+          message: "Webhook received but payment record was not found",
+        });
+      }
+
+      if (payment.webhookEvents.includes(event)) {
+        return res.status(200).json({
+          success: true,
+          message: "Payment failure webhook already processed",
+        });
+      }
+
+      payment.razorpayPaymentId = razorpayPaymentId || null;
+
+      payment.status = "FAILED";
+
+      payment.failureReason = failureReason;
+
+      payment.webhookEvents.push(event);
+
+      await payment.save();
+
+      await Order.findByIdAndUpdate(payment.order, {
+        $set: {
+          paymentStatus: "FAILED",
+        },
+        $addToSet: {
+          "paymentDetails.webhookEvents": event,
+        },
+      });
+
+      console.log(`Payment failed: ${razorpayOrderId}`);
+    }
+
+    if (event === "refund.created") {
+      const refundEntity = req.body?.payload?.refund?.entity;
+
+      const razorpayPaymentId = refundEntity?.payment_id;
+
+      const refundAmount = Number(refundEntity?.amount || 0) / 100;
+
+      if (!razorpayPaymentId) {
+        return res.status(400).json({
+          success: false,
+          message: "Refund webhook data is incomplete",
+        });
+      }
+
+      const payment = await Payment.findOne({
+        razorpayPaymentId,
+      });
+
+      if (!payment) {
+        return res.status(200).json({
+          success: true,
+          message: "Refund received but payment record was not found",
+        });
+      }
+
+      if (payment.webhookEvents.includes(event)) {
+        return res.status(200).json({
+          success: true,
+          message: "Refund webhook already processed",
+        });
+      }
+
+      payment.refundAmount = refundAmount;
+
+      payment.refundId = refundEntity?.id || null;
+
+      /*
+       * If refund equals the complete payment
+       * amount, mark it fully refunded.
+       */
+      if (refundAmount >= payment.amount) {
+        payment.status = "REFUNDED";
+      } else {
+        payment.status = "PARTIALLY_REFUNDED";
+      }
+
+      payment.webhookEvents.push(event);
+
+      await payment.save();
+
+      await Order.findByIdAndUpdate(payment.order, {
+        $set: {
+          paymentStatus:
+            payment.status === "REFUNDED" ? "REFUNDED" : "PARTIALLY_REFUNDED",
+        },
+        $addToSet: {
+          "paymentDetails.webhookEvents": event,
+        },
+      });
+
+      console.log(`Refund processed: ${refundEntity?.id}`);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Webhook processed successfully",
+    });
+  } catch (error) {
+    console.error("Razorpay webhook error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Webhook processing failed",
+    });
   }
 };

@@ -67,6 +67,11 @@ const paymentSchema = new mongoose.Schema(
       index: true,
     },
 
+    webhookEvents: {
+      type: [String],
+      default: [],
+    },
+
     failureReason: {
       type: String,
       default: null,
