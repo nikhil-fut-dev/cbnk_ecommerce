@@ -20,6 +20,8 @@ import reviewRoutes from "./routes/reviewRoutes.js";
 import adminOrderRoutes from "./routes/adminOrderRoutes.js";
 import adminProductRoutes from "./routes/adminProductRoutes.js";
 import adminCouponRoutes from "./routes/adminCouponRoutes.js";
+import adminDashboardRoutes from "./routes/adminDashboardRoutes.js";
+import adminUserRoutes from "./routes/adminUserRoutes.js";
 
 const app = express();
 
@@ -85,6 +87,8 @@ app.use("/api/v1/reviews", reviewRoutes);
 app.use("/api/v1/admin/orders", adminOrderRoutes);
 app.use("/api/v1/admin/products", adminProductRoutes);
 app.use("/api/v1/admin/coupons", adminCouponRoutes);
+app.use("/api/v1/admin/dashboard", adminDashboardRoutes);
+app.use("/api/v1/admin/users", adminUserRoutes);
 
 // Health
 app.get("/api/v1/health", (req, res) => {
