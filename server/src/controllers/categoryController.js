@@ -1,3 +1,5 @@
+import mongoose from "mongoose";
+
 import Category from "../models/Category.js";
 import Product from "../models/Product.js";
 
@@ -27,6 +29,13 @@ export const createCategory = async (req, res) => {
     let parent = null;
 
     if (parentCategory) {
+      if (!mongoose.Types.ObjectId.isValid(parentCategory)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid parent category ID",
+        });
+      }
+
       parent = await Category.findById(parentCategory);
 
       if (!parent) {
@@ -57,6 +66,13 @@ export const createCategory = async (req, res) => {
     ----------------------------- */
 
     const slug = generateSlug(name.trim());
+
+    if (!slug) {
+      return res.status(400).json({
+        success: false,
+        message: "Category name must contain valid characters",
+      });
+    }
 
     const existingCategory = await Category.findOne({ slug });
 
@@ -272,6 +288,13 @@ export const updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
 
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid category ID",
+      });
+    }
+
     const category = await Category.findById(id);
 
     if (!category) {
@@ -299,6 +322,13 @@ export const updateCategory = async (req, res) => {
 
       if (trimmedName !== category.name) {
         const newSlug = generateSlug(trimmedName);
+
+        if (!newSlug) {
+          return res.status(400).json({
+            success: false,
+            message: "Category name must contain valid characters",
+          });
+        }
 
         const existingCategory = await Category.findOne({
           slug: newSlug,
@@ -351,6 +381,13 @@ export const updateCategory = async (req, res) => {
       if (!parentCategory) {
         category.parentCategory = null;
       } else {
+        if (!mongoose.Types.ObjectId.isValid(parentCategory)) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid parent category ID",
+          });
+        }
+
         // Prevent itself as parent
         if (parentCategory.toString() === id.toString()) {
           return res.status(400).json({
@@ -437,6 +474,13 @@ export const toggleCategoryStatus = async (req, res) => {
   try {
     const { id } = req.params;
 
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid category ID",
+      });
+    }
+
     const category = await Category.findById(id);
 
     if (!category) {
@@ -496,6 +540,13 @@ export const toggleCategoryStatus = async (req, res) => {
 export const deleteCategory = async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid category ID",
+      });
+    }
 
     const category = await Category.findById(id);
 
