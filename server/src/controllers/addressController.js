@@ -239,7 +239,18 @@ export const updateAddress = async (req, res) => {
     address.postalCode = postalCode.trim();
     address.country = country.trim() || "India";
     address.addressType = addressType;
-    address.isDefault = isDefault === true;
+    
+    if (isDefault === true) {
+      await Address.updateMany(
+        {
+          user: req.user._id,
+          _id: { $ne: address._id },
+        },
+        { $set: { isDefault: false } },
+      );
+
+      address.isDefault = true;
+    }
 
     await address.save();
 

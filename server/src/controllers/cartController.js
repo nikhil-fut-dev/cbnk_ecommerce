@@ -1,5 +1,6 @@
 import Cart from "../models/Cart.js";
 import Product from "../models/Product.js";
+import { checkStock } from "../services/inventoryService.js";
 
 const getOrCreateCart = async (userId) => {
   let cart = await Cart.findOne({ user: userId });
@@ -92,7 +93,6 @@ export const addToCart = async (req, res) => {
     }
 
     let selectedPrice = product.price;
-    let selectedStock = product.stock;
 
     if (variantId) {
       const variant = product.variants.id(variantId);
@@ -105,16 +105,23 @@ export const addToCart = async (req, res) => {
       }
 
       selectedPrice = variant.price !== null ? variant.price : product.price;
-
-      selectedStock = variant.stock;
     }
 
-    if (selectedStock < parsedQuantity) {
+    const stockResult = await checkStock({
+      productId,
+      variantId,
+      quantity: parsedQuantity,
+    });
+
+    if (!stockResult.available) {
       return res.status(400).json({
         success: false,
         message: "Insufficient stock",
+        availableStock: stockResult.availableStock,
       });
     }
+
+    const selectedStock = stockResult.availableStock;
 
     const cart = await getOrCreateCart(req.user._id);
 
@@ -219,10 +226,10 @@ export const updateCartItem = async (req, res) => {
       });
     }
 
-    let availableStock = product.stock;
+    let variant = null;
 
     if (item.variant) {
-      const variant = product.variants.id(item.variant);
+      variant = product.variants.id(item.variant);
 
       if (!variant || !variant.isActive) {
         return res.status(400).json({
@@ -231,16 +238,22 @@ export const updateCartItem = async (req, res) => {
         });
       }
 
-      availableStock = variant.stock;
       item.price = variant.price !== null ? variant.price : product.price;
     } else {
       item.price = product.price;
     }
 
-    if (parsedQuantity > availableStock) {
+    const stockResult = await checkStock({
+      productId: item.product,
+      variantId: item.variant,
+      quantity: parsedQuantity,
+    });
+
+    if (!stockResult.available) {
       return res.status(400).json({
         success: false,
         message: "Requested quantity exceeds available stock",
+        availableStock: stockResult.availableStock,
       });
     }
 
