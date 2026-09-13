@@ -15,6 +15,7 @@ import addressRoutes from "./routes/addressRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import couponRoutes from "./routes/couponRoutes.js";
 import inventoryRoutes from "./routes/inventoryRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
 
 const app = express();
 
@@ -66,6 +67,7 @@ app.use("/api/v1/addresses", addressRoutes);
 app.use("/api/v1/orders", orderRoutes);
 app.use("/api/v1/coupons", couponRoutes);
 app.use("/api/v1/inventory", inventoryRoutes);
+app.use("/api/v1/payments", paymentRoutes);
 
 // Health
 app.get("/api/v1/health", (req, res) => {

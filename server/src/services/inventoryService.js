@@ -3,18 +3,17 @@ import mongoose from "mongoose";
 import Inventory from "../models/Inventory.js";
 import Product from "../models/Product.js";
 
-const isValidObjectId = (id) => {
-  return mongoose.Types.ObjectId.isValid(id);
-};
-
+/**
+ * Get inventory for a product
+ */
 export const getInventoryByProduct = async (productId) => {
-  if (!isValidObjectId(productId)) {
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
     throw new Error("Invalid product ID");
   }
 
   const inventory = await Inventory.findOne({
     product: productId,
-  }).populate("product", "name slug SKU");
+  }).populate("product", "name slug SKU price stock variants images");
 
   if (!inventory) {
     throw new Error("Inventory not found");
@@ -23,8 +22,11 @@ export const getInventoryByProduct = async (productId) => {
   return inventory;
 };
 
+/**
+ * Create or synchronize inventory from product
+ */
 export const createOrSyncInventory = async (productId) => {
-  if (!isValidObjectId(productId)) {
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
     throw new Error("Invalid product ID");
   }
 
@@ -34,41 +36,57 @@ export const createOrSyncInventory = async (productId) => {
     throw new Error("Product not found");
   }
 
-  const variantInventory = product.variants.map((variant) => ({
+  let inventory = await Inventory.findOne({
+    product: product._id,
+  });
+
+  const variants = product.variants.map((variant) => ({
     variant: variant._id,
     SKU: variant.SKU,
-    size: variant.size,
-    color: variant.color,
-    stock: variant.stock,
+    size: variant.size || "",
+    color: variant.color || "",
+    stock: variant.stock || 0,
     reservedStock: 0,
     soldStock: 0,
     lowStockThreshold: 5,
   }));
 
-  const inventory = await Inventory.findOneAndUpdate(
-    { product: product._id },
-    {
-      $set: {
-        totalStock: product.stock,
-        variants: variantInventory,
-      },
-    },
-    {
-      new: true,
-      upsert: true,
-      setDefaultsOnInsert: true,
-    },
+  const totalVariantStock = variants.reduce(
+    (total, variant) => total + variant.stock,
+    0,
   );
+
+  if (!inventory) {
+    inventory = await Inventory.create({
+      product: product._id,
+      totalStock: variants.length > 0 ? totalVariantStock : product.stock || 0,
+      reservedStock: 0,
+      soldStock: 0,
+      lowStockThreshold: 5,
+      variants,
+      lastRestockedAt: new Date(),
+    });
+  } else {
+    inventory.totalStock =
+      variants.length > 0 ? totalVariantStock : product.stock || 0;
+
+    inventory.variants = variants;
+
+    await inventory.save();
+  }
 
   return inventory;
 };
 
+/**
+ * Check available stock
+ */
 export const checkStock = async ({ productId, variantId = null, quantity }) => {
-  if (!isValidObjectId(productId)) {
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
     throw new Error("Invalid product ID");
   }
 
-  if (!Number.isInteger(quantity) || quantity < 1) {
+  if (!quantity || quantity < 1) {
     throw new Error("Quantity must be at least 1");
   }
 
@@ -81,7 +99,9 @@ export const checkStock = async ({ productId, variantId = null, quantity }) => {
   }
 
   if (variantId) {
-    const variant = inventory.variants.id(variantId);
+    const variant = inventory.variants.find(
+      (item) => item.variant?.toString() === variantId.toString(),
+    );
 
     if (!variant) {
       throw new Error("Inventory variant not found");
@@ -89,56 +109,55 @@ export const checkStock = async ({ productId, variantId = null, quantity }) => {
 
     const availableStock = variant.stock - variant.reservedStock;
 
-    if (availableStock < quantity) {
-      throw new Error(`Insufficient stock. Available stock: ${availableStock}`);
-    }
-
     return {
-      available: true,
-      stock: availableStock,
+      available: availableStock >= quantity,
+      availableStock,
     };
   }
 
   const availableStock = inventory.totalStock - inventory.reservedStock;
 
-  if (availableStock < quantity) {
-    throw new Error(`Insufficient stock. Available stock: ${availableStock}`);
-  }
-
   return {
-    available: true,
-    stock: availableStock,
+    available: availableStock >= quantity,
+    availableStock,
   };
 };
 
+/**
+ * Deduct stock atomically
+ */
 export const deductStock = async ({
   productId,
   variantId = null,
   quantity,
   session = null,
 }) => {
-  if (!isValidObjectId(productId)) {
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
     throw new Error("Invalid product ID");
   }
 
-  if (!Number.isInteger(quantity) || quantity < 1) {
+  if (!quantity || quantity < 1) {
     throw new Error("Quantity must be at least 1");
   }
 
-  const options = {
-    new: true,
-    session,
-  };
-
   if (variantId) {
-    const inventory = await Inventory.findOneAndUpdate(
+    if (!mongoose.Types.ObjectId.isValid(variantId)) {
+      throw new Error("Invalid variant ID");
+    }
+
+    const result = await Inventory.findOneAndUpdate(
       {
         product: productId,
         variants: {
           $elemMatch: {
             variant: variantId,
             $expr: {
-              $gte: [{ $subtract: ["$stock", "$reservedStock"] }, quantity],
+              $gte: [
+                {
+                  $subtract: ["$$this.stock", "$$this.reservedStock"],
+                },
+                quantity,
+              ],
             },
           },
         },
@@ -147,23 +166,33 @@ export const deductStock = async ({
         $inc: {
           "variants.$.stock": -quantity,
           "variants.$.soldStock": quantity,
+          totalStock: -quantity,
+          soldStock: quantity,
         },
       },
-      options,
+      {
+        new: true,
+        session,
+      },
     );
 
-    if (!inventory) {
+    if (!result) {
       throw new Error("Insufficient variant stock");
     }
 
-    return inventory;
+    return result;
   }
 
-  const inventory = await Inventory.findOneAndUpdate(
+  const result = await Inventory.findOneAndUpdate(
     {
       product: productId,
       $expr: {
-        $gte: [{ $subtract: ["$totalStock", "$reservedStock"] }, quantity],
+        $gte: [
+          {
+            $subtract: ["$totalStock", "$reservedStock"],
+          },
+          quantity,
+        ],
       },
     },
     {
@@ -172,37 +201,42 @@ export const deductStock = async ({
         soldStock: quantity,
       },
     },
-    options,
+    {
+      new: true,
+      session,
+    },
   );
 
-  if (!inventory) {
+  if (!result) {
     throw new Error("Insufficient stock");
   }
 
-  return inventory;
+  return result;
 };
 
+/**
+ * Restore stock
+ */
 export const restoreStock = async ({
   productId,
   variantId = null,
   quantity,
   session = null,
 }) => {
-  if (!isValidObjectId(productId)) {
+  if (!mongoose.Types.ObjectId.isValid(productId)) {
     throw new Error("Invalid product ID");
   }
 
-  if (!Number.isInteger(quantity) || quantity < 1) {
+  if (!quantity || quantity < 1) {
     throw new Error("Quantity must be at least 1");
   }
 
-  const options = {
-    new: true,
-    session,
-  };
-
   if (variantId) {
-    const inventory = await Inventory.findOneAndUpdate(
+    if (!mongoose.Types.ObjectId.isValid(variantId)) {
+      throw new Error("Invalid variant ID");
+    }
+
+    const result = await Inventory.findOneAndUpdate(
       {
         product: productId,
         "variants.variant": variantId,
@@ -211,19 +245,24 @@ export const restoreStock = async ({
         $inc: {
           "variants.$.stock": quantity,
           "variants.$.soldStock": -quantity,
+          totalStock: quantity,
+          soldStock: -quantity,
         },
       },
-      options,
+      {
+        new: true,
+        session,
+      },
     );
 
-    if (!inventory) {
+    if (!result) {
       throw new Error("Inventory variant not found");
     }
 
-    return inventory;
+    return result;
   }
 
-  const inventory = await Inventory.findOneAndUpdate(
+  const result = await Inventory.findOneAndUpdate(
     {
       product: productId,
     },
@@ -233,12 +272,15 @@ export const restoreStock = async ({
         soldStock: -quantity,
       },
     },
-    options,
+    {
+      new: true,
+      session,
+    },
   );
 
-  if (!inventory) {
+  if (!result) {
     throw new Error("Inventory not found");
   }
 
-  return inventory;
+  return result;
 };
