@@ -1,6 +1,16 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowRight, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  ArrowRight,
+  Minus,
+  Plus,
+  ShoppingBag,
+  Trash2,
+  Tag,
+  X,
+  Check,
+} from "lucide-react";
+import toast from "react-hot-toast";
 
 import {
   getCart,
@@ -9,12 +19,23 @@ import {
   clearCart,
 } from "../../services/api/cartApi";
 
+import { validateCoupon } from "../../services/api/couponApi";
+
 const Cart = () => {
+  const navigate = useNavigate();
+
   const [cart, setCart] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
   const [updatingItem, setUpdatingItem] = useState(null);
   const [clearingCart, setClearingCart] = useState(false);
+
+  // Coupon state
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [couponLoading, setCouponLoading] = useState(false);
 
   const fetchCart = async () => {
     try {
@@ -52,11 +73,21 @@ const Cart = () => {
 
       if (response?.success) {
         setCart(response.cart);
+
+        // Cart changed, so previously applied coupon must be
+        // validated again against the new subtotal.
+        if (appliedCoupon) {
+          setAppliedCoupon(null);
+          setCouponDiscount(0);
+          setCouponCode("");
+          toast("Coupon removed because cart quantity changed.");
+        }
+      } else {
+        toast.error(response?.message || "Unable to update cart.");
       }
     } catch (err) {
-      console.error(
-        "Update cart error:",
-        err?.response?.data?.message || err.message,
+      toast.error(
+        err?.response?.data?.message || "Unable to update cart item.",
       );
     } finally {
       setUpdatingItem(null);
@@ -71,11 +102,19 @@ const Cart = () => {
 
       if (response?.success) {
         setCart(response.cart);
+
+        if (appliedCoupon) {
+          setAppliedCoupon(null);
+          setCouponDiscount(0);
+          setCouponCode("");
+          toast("Coupon removed because cart changed.");
+        }
+      } else {
+        toast.error(response?.message || "Unable to remove item.");
       }
     } catch (err) {
-      console.error(
-        "Remove cart item error:",
-        err?.response?.data?.message || err.message,
+      toast.error(
+        err?.response?.data?.message || "Unable to remove cart item.",
       );
     } finally {
       setUpdatingItem(null);
@@ -90,15 +129,98 @@ const Cart = () => {
 
       if (response?.success) {
         setCart(response.cart || { items: [] });
+
+        setAppliedCoupon(null);
+        setCouponDiscount(0);
+        setCouponCode("");
+
+        toast.success("Cart cleared successfully.");
+      } else {
+        toast.error(response?.message || "Unable to clear cart.");
       }
     } catch (err) {
-      console.error(
-        "Clear cart error:",
-        err?.response?.data?.message || err.message,
-      );
+      toast.error(err?.response?.data?.message || "Unable to clear cart.");
     } finally {
       setClearingCart(false);
     }
+  };
+
+  const handleApplyCoupon = async () => {
+    const normalizedCode = couponCode.trim().toUpperCase();
+
+    if (!normalizedCode) {
+      toast.error("Please enter a coupon code.");
+      return;
+    }
+
+    if (subtotal <= 0) {
+      toast.error("Your cart is empty.");
+      return;
+    }
+
+    try {
+      setCouponLoading(true);
+
+      /*
+       * Backend coupon service expects:
+       * product
+       * category
+       * price
+       * quantity
+       *
+       * We send the data available from the populated cart.
+       */
+      const couponItems = items.map((item) => ({
+        product: item.product?._id,
+        category: item.product?.category || null,
+        price: Number(item.price || 0),
+        quantity: Number(item.quantity || 0),
+      }));
+
+      const response = await validateCoupon({
+        code: normalizedCode,
+        subtotal,
+        items: couponItems,
+      });
+
+      if (!response?.success) {
+        toast.error(response?.message || "Unable to apply coupon.");
+        return;
+      }
+
+      const discount = Number(response?.coupon?.discount || 0);
+
+      setAppliedCoupon(response.coupon);
+      setCouponDiscount(discount);
+      setCouponCode(response.coupon.code);
+
+      toast.success(response.message || "Coupon applied successfully.");
+    } catch (err) {
+      setAppliedCoupon(null);
+      setCouponDiscount(0);
+
+      toast.error(
+        err?.response?.data?.message || "Invalid or inactive coupon.",
+      );
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponDiscount(0);
+    setCouponCode("");
+
+    toast.success("Coupon removed.");
+  };
+
+  const handleCheckout = () => {
+    navigate("/checkout", {
+      state: {
+        couponCode: appliedCoupon?.code || null,
+      },
+    });
   };
 
   const items = cart?.items || [];
@@ -110,6 +232,8 @@ const Cart = () => {
   const totalItems = items.reduce((total, item) => {
     return total + Number(item.quantity || 0);
   }, 0);
+
+  const discountedSubtotal = Math.max(subtotal - couponDiscount, 0);
 
   if (loading) {
     return (
@@ -370,6 +494,79 @@ const Cart = () => {
               Order Summary
             </h2>
 
+            {/* Coupon */}
+            <div className="mt-6 border-b border-neutral-200 pb-6">
+              <div className="flex items-center gap-2">
+                <Tag size={17} className="text-neutral-700" />
+
+                <h3 className="text-sm font-bold text-neutral-950">
+                  Have a coupon?
+                </h3>
+              </div>
+
+              {!appliedCoupon ? (
+                <div className="mt-3 flex gap-2">
+                  <input
+                    type="text"
+                    value={couponCode}
+                    onChange={(event) => setCouponCode(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        handleApplyCoupon();
+                      }
+                    }}
+                    placeholder="Enter coupon code"
+                    className="min-w-0 flex-1 rounded-xl border border-neutral-200 px-3.5 py-3 text-sm uppercase outline-none transition placeholder:normal-case focus:border-neutral-950"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={handleApplyCoupon}
+                    disabled={couponLoading}
+                    className="rounded-xl bg-neutral-950 px-4 py-3 text-xs font-bold uppercase tracking-[0.08em] text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {couponLoading ? "..." : "Apply"}
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-950 text-white">
+                        <Check size={16} />
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.12em] text-neutral-950">
+                          {appliedCoupon.code}
+                        </p>
+
+                        {appliedCoupon.description && (
+                          <p className="mt-1 text-xs text-neutral-500">
+                            {appliedCoupon.description}
+                          </p>
+                        )}
+
+                        <p className="mt-1 text-xs font-semibold text-green-600">
+                          You saved ₹{couponDiscount.toLocaleString("en-IN")}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleRemoveCoupon}
+                      className="text-neutral-400 transition hover:text-red-600"
+                      aria-label="Remove coupon"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Pricing */}
             <div className="mt-6 space-y-4 text-sm">
               <div className="flex justify-between">
                 <span className="text-neutral-500">Subtotal</span>
@@ -379,10 +576,21 @@ const Cart = () => {
                 </span>
               </div>
 
+              {couponDiscount > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-neutral-500">Coupon Discount</span>
+
+                  <span className="font-semibold text-green-600">
+                    -₹
+                    {couponDiscount.toLocaleString("en-IN")}
+                  </span>
+                </div>
+              )}
+
               <div className="flex justify-between">
                 <span className="text-neutral-500">Shipping</span>
 
-                <span className="font-semibold text-green-600">
+                <span className="font-semibold text-neutral-500">
                   Calculated at checkout
                 </span>
               </div>
@@ -396,17 +604,24 @@ const Cart = () => {
               </span>
 
               <span className="text-xl font-bold text-neutral-950">
-                ₹{subtotal.toLocaleString("en-IN")}
+                ₹{discountedSubtotal.toLocaleString("en-IN")}
               </span>
             </div>
 
-            <Link
-              to="/checkout"
+            {couponDiscount > 0 && (
+              <p className="mt-2 text-right text-xs text-green-600">
+                Coupon applied. Shipping will be calculated at checkout.
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={handleCheckout}
               className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-neutral-950 px-5 py-4 text-sm font-bold text-white transition hover:bg-neutral-800"
             >
               Proceed to Checkout
               <ArrowRight size={17} />
-            </Link>
+            </button>
 
             <Link
               to="/"
