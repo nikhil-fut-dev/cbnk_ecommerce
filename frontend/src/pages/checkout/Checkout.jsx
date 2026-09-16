@@ -6,6 +6,11 @@ import { getAddresses } from "../../services/api/addressApi";
 import { getCart } from "../../services/api/cartApi";
 import { createOrder } from "../../services/api/orderApi";
 
+import {
+  createRazorpayOrder,
+  verifyRazorpayPayment,
+} from "../../services/api/paymentApi";
+
 const Checkout = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -129,17 +134,15 @@ const Checkout = () => {
       setPlacingOrder(true);
 
       /*
-       * IMPORTANT:
-       *
-       * We send only the values required by
-       * the backend.
+       * STEP 1
+       * Create CBNK order in our backend.
        *
        * Backend calculates:
-       * subtotal
-       * discount
-       * shipping
-       * tax
-       * total
+       * - subtotal
+       * - coupon discount
+       * - shipping
+       * - tax
+       * - final total
        */
       const response = await createOrder({
         addressId: selectedAddressId,
@@ -157,18 +160,12 @@ const Checkout = () => {
         throw new Error("Order was created but order ID is missing");
       }
 
-      toast.success("Order created successfully");
-
       /*
-       * COD:
-       *
-       * Backend currently creates the order with
-       * paymentStatus = PENDING and orderStatus = PENDING.
-       *
-       * We will handle the final COD flow after
-       * confirming the backend's intended COD behavior.
+       * COD FLOW
        */
       if (paymentMethod === "COD") {
+        toast.success("Order placed successfully");
+
         navigate(`/account/orders/${createdOrder._id}`, {
           replace: true,
         });
@@ -177,27 +174,166 @@ const Checkout = () => {
       }
 
       /*
-       * Razorpay:
+       * RAZORPAY FLOW
        *
-       * Do NOT mark the order as paid here.
-       *
-       * Next step will create Razorpay payment order,
-       * open Razorpay Checkout and verify payment.
+       * First ask backend to create Razorpay order.
        */
-      navigate("/checkout/payment", {
-        replace: true,
-        state: {
+      const razorpayResponse = await createRazorpayOrder(createdOrder._id);
+
+      if (!razorpayResponse?.success) {
+        throw new Error(
+          razorpayResponse?.message || "Failed to create Razorpay order",
+        );
+      }
+
+      const paymentData = razorpayResponse?.data;
+
+      if (
+        !paymentData?.razorpayOrderId ||
+        !paymentData?.paymentId ||
+        !paymentData?.amount ||
+        !paymentData?.keyId
+      ) {
+        throw new Error("Invalid Razorpay payment data received");
+      }
+
+      /*
+       * Razorpay Checkout options.
+       */
+      const options = {
+        key: paymentData.keyId,
+
+        amount: paymentData.amount,
+
+        currency: paymentData.currency || "INR",
+
+        name: "CBNK",
+
+        description: `Payment for order ${paymentData.orderNumber}`,
+
+        order_id: paymentData.razorpayOrderId,
+
+        handler: async function (paymentResponse) {
+          try {
+            toast.loading("Verifying payment...", {
+              id: "payment-verification",
+            });
+
+            /*
+             * Verify Razorpay payment on our backend.
+             *
+             * IMPORTANT:
+             * Frontend never decides whether payment
+             * is successful.
+             *
+             * Backend verifies Razorpay signature
+             * and payment details.
+             */
+            const verificationResponse = await verifyRazorpayPayment({
+              orderId: createdOrder._id,
+
+              razorpayOrderId: paymentResponse.razorpay_order_id,
+
+              razorpayPaymentId: paymentResponse.razorpay_payment_id,
+
+              razorpaySignature: paymentResponse.razorpay_signature,
+            });
+
+            toast.dismiss("payment-verification");
+
+            if (!verificationResponse?.success) {
+              throw new Error(
+                verificationResponse?.message || "Payment verification failed",
+              );
+            }
+
+            toast.success("Payment successful");
+
+            /*
+             * Payment verified successfully.
+             * Now go to order details.
+             */
+            navigate(`/account/orders/${createdOrder._id}`, {
+              replace: true,
+            });
+          } catch (verificationError) {
+            console.error(
+              "Razorpay payment verification error:",
+              verificationError,
+            );
+
+            toast.dismiss("payment-verification");
+
+            const message =
+              verificationError.response?.data?.message ||
+              verificationError.message ||
+              "Payment verification failed";
+
+            toast.error(message);
+
+            /*
+             * Payment may still exist on Razorpay side.
+             * Keep the user on checkout/payment flow
+             * instead of falsely showing success.
+             */
+          }
+        },
+
+        prefill: {
+          name: createdOrder?.shippingAddress?.fullName || "",
+          email: "",
+          contact: createdOrder?.shippingAddress?.phone || "",
+        },
+
+        notes: {
           orderId: createdOrder._id,
           orderNumber: createdOrder.orderNumber,
-          amount: response?.data?.pricing?.total,
-          currency: "INR",
         },
+
+        theme: {
+          color: "#111111",
+        },
+
+        modal: {
+          ondismiss: function () {
+            toast("Payment window closed", {
+              icon: "ℹ️",
+            });
+          },
+        },
+      };
+
+      /*
+       * Razorpay Checkout must be loaded
+       * from frontend/index.html.
+       */
+      if (!window.Razorpay) {
+        throw new Error(
+          "Razorpay Checkout is not loaded. Please check frontend/index.html",
+        );
+      }
+
+      const razorpay = new window.Razorpay(options);
+
+      /*
+       * Razorpay can also report payment failures.
+       */
+      razorpay.on("payment.failed", function (failureResponse) {
+        console.error("Razorpay payment failed:", failureResponse);
+
+        const description =
+          failureResponse?.error?.description ||
+          "Payment failed. Please try again.";
+
+        toast.error(description);
       });
+
+      razorpay.open();
     } catch (err) {
-      console.error("Place order error:", err);
+      console.error("Place order / payment error:", err);
 
       const message =
-        err.response?.data?.message || err.message || "Failed to create order";
+        err.response?.data?.message || err.message || "Failed to process order";
 
       toast.error(message);
     } finally {

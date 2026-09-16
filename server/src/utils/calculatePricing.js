@@ -23,7 +23,7 @@ export const calculateCouponDiscount = ({ coupon, subtotal }) => {
 };
 
 export const calculateShippingFee = (subtotal) => {
-  return subtotal >= 999 ? 0 : 79;
+  return subtotal >= 999 ? 0 : 0;
 };
 
 export const calculateOrderPricing = ({ subtotal, coupon = null }) => {
@@ -37,7 +37,7 @@ export const calculateOrderPricing = ({ subtotal, coupon = null }) => {
   // GST/tax engine can be added later.
   const tax = 0;
 
-  const shippingFee = taxableAmount >= 999 ? 0 : 79;
+  const shippingFee = taxableAmount >= 999 ? 0 : 0;
 
   const total = taxableAmount + shippingFee + tax;
 

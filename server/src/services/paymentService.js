@@ -10,7 +10,7 @@ export const createRazorpayOrder = async ({ order, user }) => {
     throw new Error("Order does not belong to this user");
   }
 
-  if (order.status === "CANCELLED") {
+  if (order.orderStatus === "CANCELLED") {
     throw new Error("Cancelled order cannot be paid");
   }
 

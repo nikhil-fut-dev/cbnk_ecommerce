@@ -2,7 +2,7 @@ import Coupon from "../models/Coupon.js";
 import CouponUsage from "../models/CouponUsage.js";
 
 const FREE_SHIPPING_THRESHOLD = 999;
-const SHIPPING_FEE = 79;
+const SHIPPING_FEE = 0;
 const TAX_RATE = 0;
 
 /*
