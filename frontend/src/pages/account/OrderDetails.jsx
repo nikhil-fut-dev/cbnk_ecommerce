@@ -4,6 +4,8 @@ import toast from "react-hot-toast";
 
 import { getOrderById, cancelOrder } from "../../services/api/orderApi";
 
+import { createReview, getMyReviews } from "../../services/api/reviewApi";
+
 const OrderDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -13,6 +15,11 @@ const OrderDetails = () => {
   const [error, setError] = useState("");
 
   const [cancelling, setCancelling] = useState(false);
+
+  const [myReviews, setMyReviews] = useState([]);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewSubmitting, setReviewSubmitting] = useState({});
+  const [reviewForm, setReviewForm] = useState({});
 
   const loadOrder = async () => {
     try {
@@ -46,6 +53,28 @@ const OrderDetails = () => {
       loadOrder();
     }
   }, [id]);
+
+  useEffect(() => {
+    const loadMyReviews = async () => {
+      try {
+        setReviewLoading(true);
+
+        const response = await getMyReviews();
+
+        if (!response?.success) {
+          throw new Error(response?.message || "Failed to load reviews");
+        }
+
+        setMyReviews(response.data || []);
+      } catch (error) {
+        console.error("Load my reviews error:", error);
+      } finally {
+        setReviewLoading(false);
+      }
+    };
+
+    loadMyReviews();
+  }, []);
 
   const handleCancelOrder = async () => {
     if (!order?._id) return;
@@ -126,6 +155,120 @@ const OrderDetails = () => {
   const canCancel = ["PENDING", "CONFIRMED", "PROCESSING"].includes(
     order?.orderStatus,
   );
+
+  const getItemProductId = (item) => {
+    if (!item?.product) return "";
+
+    return typeof item.product === "object"
+      ? item.product._id?.toString()
+      : item.product.toString();
+  };
+
+  const getExistingReview = (item) => {
+    const productId = getItemProductId(item);
+
+    return myReviews.find(
+      (review) =>
+        review?.product?._id?.toString() === productId &&
+        review?.order?._id?.toString() === order?._id?.toString(),
+    );
+  };
+
+  const getReviewForm = (item) => {
+    const productId = getItemProductId(item);
+
+    return (
+      reviewForm[productId] || {
+        rating: 5,
+        title: "",
+        comment: "",
+      }
+    );
+  };
+
+  const updateReviewForm = (item, field, value) => {
+    const productId = getItemProductId(item);
+
+    setReviewForm((prev) => ({
+      ...prev,
+      [productId]: {
+        ...getReviewForm(item),
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleSubmitReview = async (item) => {
+    if (!order?._id || order.orderStatus !== "DELIVERED") {
+      return;
+    }
+
+    const productId = getItemProductId(item);
+
+    if (!productId) {
+      toast.error("Product information is missing.");
+      return;
+    }
+
+    const existingReview = getExistingReview(item);
+
+    if (existingReview) {
+      toast.error("You have already reviewed this product for this order.");
+      return;
+    }
+
+    const form = getReviewForm(item);
+
+    if (!form.rating || Number(form.rating) < 1 || Number(form.rating) > 5) {
+      toast.error("Please select a rating between 1 and 5.");
+      return;
+    }
+
+    try {
+      setReviewSubmitting((prev) => ({
+        ...prev,
+        [productId]: true,
+      }));
+
+      const response = await createReview({
+        productId,
+        orderId: order._id,
+        rating: Number(form.rating),
+        title: form.title.trim(),
+        comment: form.comment.trim(),
+      });
+
+      if (!response?.success) {
+        throw new Error(response?.message || "Failed to submit review");
+      }
+
+      toast.success(
+        response.message ||
+          "Review submitted successfully. It is pending approval.",
+      );
+
+      setMyReviews((prev) => [response.data || response.review, ...prev]);
+
+      setReviewForm((prev) => {
+        const updated = { ...prev };
+        delete updated[productId];
+        return updated;
+      });
+    } catch (error) {
+      console.error("Submit review error:", error);
+
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Failed to submit review",
+      );
+    } finally {
+      setReviewSubmitting((prev) => ({
+        ...prev,
+        [productId]: false,
+      }));
+    }
+  };
 
   if (loading) {
     return (
@@ -309,6 +452,134 @@ const OrderDetails = () => {
                           ₹{Number(item.total || 0).toFixed(2)}
                         </p>
                       </div>
+
+                      {order.orderStatus === "DELIVERED" && (
+                        <div className="mt-5 border-t border-gray-100 pt-5">
+                          {(() => {
+                            const existingReview = getExistingReview(item);
+                            const form = getReviewForm(item);
+                            const productId = getItemProductId(item);
+                            const submitting = Boolean(
+                              reviewSubmitting[productId],
+                            );
+
+                            if (existingReview) {
+                              return (
+                                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                                  <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                      <p className="text-sm font-semibold text-gray-900">
+                                        Review Submitted
+                                      </p>
+
+                                      <p className="mt-1 text-xs text-gray-500">
+                                        Status:{" "}
+                                        {existingReview.status || "PENDING"}
+                                      </p>
+                                    </div>
+
+                                    <div className="text-sm tracking-wide text-amber-500">
+                                      {"★".repeat(
+                                        Number(existingReview.rating || 0),
+                                      )}
+                                      {"☆".repeat(
+                                        5 - Number(existingReview.rating || 0),
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {existingReview.title && (
+                                    <p className="mt-3 text-sm font-semibold text-gray-900">
+                                      {existingReview.title}
+                                    </p>
+                                  )}
+
+                                  {existingReview.comment && (
+                                    <p className="mt-1 text-sm leading-6 text-gray-600">
+                                      {existingReview.comment}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div className="rounded-xl border border-gray-200 bg-white p-4">
+                                <p className="text-sm font-semibold text-gray-900">
+                                  Rate this product
+                                </p>
+
+                                <div className="mt-4 flex items-center gap-2">
+                                  {[1, 2, 3, 4, 5].map((star) => (
+                                    <button
+                                      key={star}
+                                      type="button"
+                                      onClick={() =>
+                                        updateReviewForm(item, "rating", star)
+                                      }
+                                      className="text-2xl transition hover:scale-110"
+                                      aria-label={`Rate ${star} out of 5`}
+                                    >
+                                      <span
+                                        className={
+                                          star <= Number(form.rating)
+                                            ? "text-amber-500"
+                                            : "text-gray-300"
+                                        }
+                                      >
+                                        ★
+                                      </span>
+                                    </button>
+                                  ))}
+                                </div>
+
+                                <input
+                                  type="text"
+                                  value={form.title}
+                                  onChange={(event) =>
+                                    updateReviewForm(
+                                      item,
+                                      "title",
+                                      event.target.value,
+                                    )
+                                  }
+                                  placeholder="Review title (optional)"
+                                  maxLength={150}
+                                  className="mt-4 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-900"
+                                />
+
+                                <textarea
+                                  value={form.comment}
+                                  onChange={(event) =>
+                                    updateReviewForm(
+                                      item,
+                                      "comment",
+                                      event.target.value,
+                                    )
+                                  }
+                                  placeholder="Share your experience with this product..."
+                                  maxLength={2000}
+                                  rows={4}
+                                  className="mt-3 w-full resize-none rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-gray-900"
+                                />
+
+                                <div className="mt-3 flex justify-end">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSubmitReview(item)}
+                                    disabled={submitting || reviewLoading}
+                                    className="rounded-xl bg-black px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    {submitting
+                                      ? "Submitting..."
+                                      : "Submit Review"}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

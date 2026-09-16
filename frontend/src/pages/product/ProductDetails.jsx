@@ -23,6 +23,8 @@ import {
   removeFromWishlist,
 } from "../../services/api/wishlistApi";
 
+import { getProductReviews } from "../../services/api/reviewApi";
+
 const ProductDetails = () => {
   const { slug } = useParams();
 
@@ -58,6 +60,15 @@ const ProductDetails = () => {
   const [wishlistLoading, setWishlistLoading] = useState(false);
 
   // =========================================================
+  // REVIEW STATE
+  // =========================================================
+
+  const [reviews, setReviews] = useState([]);
+  const [reviewLoading, setReviewLoading] = useState(true);
+  const [reviewError, setReviewError] = useState("");
+  const [reviewPagination, setReviewPagination] = useState(null);
+
+  // =========================================================
   // FETCH PRODUCT
   // =========================================================
 
@@ -88,6 +99,45 @@ const ProductDetails = () => {
       fetchProduct();
     }
   }, [slug]);
+
+  // =========================================================
+  // REVIEWS CHECK
+  // =========================================================
+
+  useEffect(() => {
+    if (!product?._id) return;
+
+    const loadReviews = async () => {
+      try {
+        setReviewLoading(true);
+        setReviewError("");
+
+        const response = await getProductReviews(product._id, {
+          page: 1,
+          limit: 10,
+        });
+
+        if (!response?.success) {
+          throw new Error(response?.message || "Failed to load reviews");
+        }
+
+        setReviews(response.data || []);
+        setReviewPagination(response.pagination || null);
+      } catch (error) {
+        console.error("Load reviews error:", error);
+
+        setReviewError(
+          error.response?.data?.message ||
+            error.message ||
+            "Failed to load reviews",
+        );
+      } finally {
+        setReviewLoading(false);
+      }
+    };
+
+    loadReviews();
+  }, [product?._id]);
 
   // =========================================================
   // CHECK WISHLIST
@@ -170,7 +220,7 @@ const ProductDetails = () => {
 
   const rating = Number(product?.rating || 0);
 
-  const reviewCount = Number(product?.reviewCount || 0);
+  const productReviewCount = Number(product?.reviewCount || 0);
 
   const compareAtPrice = Number(product?.compareAtPrice || 0);
 
@@ -187,6 +237,16 @@ const ProductDetails = () => {
           selectedVariant._id?.toString(),
       )
     : null;
+
+  const reviewCount = reviews.length;
+
+  const averageRating =
+    reviewCount > 0
+      ? reviews.reduce(
+          (total, review) => total + Number(review.rating || 0),
+          0,
+        ) / reviewCount
+      : 0;
 
   // =========================================================
   // AVAILABLE STOCK
@@ -694,9 +754,10 @@ const ProductDetails = () => {
                     </span>
                   </div>
 
-                  {reviewCount > 0 && (
+                  {productReviewCount > 0 && (
                     <span className="text-sm text-neutral-500">
-                      {reviewCount} {reviewCount === 1 ? "review" : "reviews"}
+                      {productReviewCount}{" "}
+                      {productReviewCount === 1 ? "review" : "reviews"}
                     </span>
                   )}
                 </div>
@@ -998,6 +1059,136 @@ const ProductDetails = () => {
             </div>
           </div>
         </div>
+      </section>
+
+      {/* =====================================================
+          REVIEWS & RATINGS
+      ====================================================== */}
+
+      <section className="mt-10 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">
+              Customer Reviews
+            </p>
+
+            <h2 className="mt-2 text-2xl font-semibold text-neutral-950">
+              Reviews & Ratings
+            </h2>
+
+            <p className="mt-1 text-sm text-neutral-500">
+              See what verified customers are saying about this product.
+            </p>
+          </div>
+
+          {reviewCount > 0 && (
+            <div className="rounded-xl bg-neutral-50 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-bold text-neutral-950">
+                  {averageRating.toFixed(1)}
+                </span>
+
+                <span className="text-amber-500">
+                  {"★".repeat(Math.round(averageRating))}
+                </span>
+              </div>
+
+              <p className="mt-1 text-xs text-neutral-500">
+                {reviewCount} review{reviewCount !== 1 ? "s" : ""}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {reviewLoading ? (
+          <div className="mt-6 space-y-4">
+            {[1, 2, 3].map((item) => (
+              <div
+                key={item}
+                className="animate-pulse rounded-xl border border-neutral-100 p-4"
+              >
+                <div className="h-4 w-32 rounded bg-neutral-200" />
+                <div className="mt-3 h-3 w-24 rounded bg-neutral-200" />
+                <div className="mt-4 h-3 w-full rounded bg-neutral-200" />
+                <div className="mt-2 h-3 w-4/5 rounded bg-neutral-200" />
+              </div>
+            ))}
+          </div>
+        ) : reviewError ? (
+          <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4">
+            <p className="text-sm text-red-600">{reviewError}</p>
+          </div>
+        ) : reviews.length === 0 ? (
+          <div className="mt-6 rounded-xl border border-dashed border-neutral-300 p-8 text-center">
+            <p className="font-medium text-neutral-900">No reviews yet</p>
+
+            <p className="mt-1 text-sm text-neutral-500">
+              Be the first customer to review this product.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-6 divide-y divide-neutral-100">
+            {reviews.map((review) => {
+              const reviewerName =
+                review.user?.fullName || review.user?.username || "Customer";
+
+              return (
+                <article key={review._id} className="py-6 first:pt-0 last:pb-0">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold text-neutral-900">
+                          {reviewerName}
+                        </h3>
+
+                        {review.isVerifiedPurchase && (
+                          <span className="rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700">
+                            Verified Purchase
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="text-sm tracking-wide text-amber-500">
+                          {"★".repeat(Number(review.rating))}
+                          {"☆".repeat(5 - Number(review.rating))}
+                        </span>
+
+                        <span className="text-xs text-neutral-400">
+                          {Number(review.rating)}/5
+                        </span>
+                      </div>
+                    </div>
+
+                    <time className="text-xs text-neutral-400">
+                      {review.createdAt
+                        ? new Date(review.createdAt).toLocaleDateString()
+                        : ""}
+                    </time>
+                  </div>
+
+                  {review.title && (
+                    <h4 className="mt-4 font-medium text-neutral-950">
+                      {review.title}
+                    </h4>
+                  )}
+
+                  {review.comment && (
+                    <p className="mt-2 text-sm leading-6 text-neutral-600">
+                      {review.comment}
+                    </p>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        )}
+
+        {reviewPagination?.totalPages > 1 && (
+          <div className="mt-6 border-t border-neutral-100 pt-4 text-center text-sm text-neutral-500">
+            Page {reviewPagination.page} of {reviewPagination.totalPages}
+          </div>
+        )}
       </section>
 
       {/* =====================================================

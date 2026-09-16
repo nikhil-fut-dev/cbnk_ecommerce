@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
 const Account = () => {
@@ -31,6 +32,43 @@ const Account = () => {
             </p>
           </div>
 
+          {/* Account Links */}
+          <div className="mt-8 grid gap-3 sm:grid-cols-2">
+            <Link
+              to="/account/orders"
+              className="rounded-xl border border-neutral-200 bg-white p-4 transition hover:border-neutral-400 hover:bg-neutral-50"
+            >
+              <p className="font-semibold text-neutral-900">My Orders</p>
+
+              <p className="mt-1 text-sm text-neutral-500">
+                View your orders and order details
+              </p>
+            </Link>
+
+            <Link
+              to="/account/addresses"
+              className="rounded-xl border border-neutral-200 bg-white p-4 transition hover:border-neutral-400 hover:bg-neutral-50"
+            >
+              <p className="font-semibold text-neutral-900">My Addresses</p>
+
+              <p className="mt-1 text-sm text-neutral-500">
+                Manage your shipping addresses
+              </p>
+            </Link>
+
+            <Link
+              to="/account/reviews"
+              className="rounded-xl border border-neutral-200 bg-white p-4 transition hover:border-neutral-400 hover:bg-neutral-50"
+            >
+              <p className="font-semibold text-neutral-900">My Reviews</p>
+
+              <p className="mt-1 text-sm text-neutral-500">
+                Manage your product reviews and ratings
+              </p>
+            </Link>
+          </div>
+
+          {/* Logout */}
           <button
             type="button"
             onClick={handleLogout}
