@@ -499,7 +499,7 @@ export const cancelOrder = async (req, res) => {
       order.cancellation = {
         reason,
         cancelledAt: new Date(),
-        cancelledBy: "CUSTOMER",
+        cancelledBy: req.user._id,
       };
 
       cancelledOrder = await order.save({ session });
