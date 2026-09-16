@@ -10,6 +10,9 @@ import Cart from "../pages/cart/Cart";
 import Wishlist from "../pages/wishlist/Wishlist";
 import Shop from "../pages/shop/Shop";
 import Addresses from "../pages/account/Addresses";
+import Checkout from "../pages/checkout/Checkout";
+import Orders from "../pages/account/Orders";
+import OrderDetails from "../pages/account/OrderDetails";
 
 const AppRoutes = () => {
   return (
@@ -22,9 +25,12 @@ const AppRoutes = () => {
 
       <Route element={<ProtectedRoute />}>
         <Route path="/account" element={<Account />} />
+        <Route path="/account/addresses" element={<Addresses />} />
+        <Route path="/account/orders" element={<Orders />} />
+        <Route path="/account/orders/:id" element={<OrderDetails />} />
         <Route path="/cart" element={<Cart />} />
         <Route path="/wishlist" element={<Wishlist />} />
-        <Route path="/account/addresses" element={<Addresses />} />
+        <Route path="/checkout" element={<Checkout />} />
       </Route>
     </Routes>
   );
