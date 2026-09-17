@@ -10,6 +10,8 @@ import AdminOrders from "../pages/orders/AdminOrders";
 import AdminOrderDetails from "../pages/orders/AdminOrderDetails";
 import AdminCategories from "../pages/categories/AdminCategories";
 import AdminCategoryForm from "../pages/categories/AdminCategoryForm";
+import AdminCoupons from "../pages/coupons/AdminCoupons";
+import AdminCouponForm from "../pages/coupons/AdminCouponForm";
 
 const AdminRoutes = () => {
   return (
@@ -34,6 +36,12 @@ const AdminRoutes = () => {
             path="/admin/categories/:id/edit"
             element={<AdminCategoryForm />}
           />
+
+          <Route path="/admin/coupons" element={<AdminCoupons />} />
+
+          <Route path="/admin/coupons/new" element={<AdminCouponForm />} />
+
+          <Route path="/admin/coupons/:id/edit" element={<AdminCouponForm />} />
         </Route>
       </Route>
     </Routes>
