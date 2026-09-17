@@ -18,6 +18,14 @@ const AdminOrders = () => {
 
   const [loading, setLoading] = useState(true);
 
+  // Filters
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
   const fetchOrders = async (page = 1) => {
     try {
       setLoading(true);
@@ -25,10 +33,17 @@ const AdminOrders = () => {
       const response = await getAdminOrders({
         page,
         limit: pagination.limit,
+        search,
+        status,
+        paymentStatus,
+        paymentMethod,
+        startDate,
+        endDate,
       });
 
       if (response.success) {
         setOrders(response.data?.orders || []);
+
         setPagination(
           response.data?.pagination || {
             page: 1,
@@ -54,7 +69,7 @@ const AdminOrders = () => {
 
   useEffect(() => {
     fetchOrders(1);
-  }, []);
+  }, [search, status, paymentStatus, paymentMethod, startDate, endDate]);
 
   const handlePrevious = () => {
     if (pagination.hasPrev) {
@@ -68,6 +83,15 @@ const AdminOrders = () => {
     }
   };
 
+  const handleResetFilters = () => {
+    setSearch("");
+    setStatus("");
+    setPaymentStatus("");
+    setPaymentMethod("");
+    setStartDate("");
+    setEndDate("");
+  };
+
   const formatDate = (date) => {
     if (!date) return "N/A";
 
@@ -78,8 +102,8 @@ const AdminOrders = () => {
     });
   };
 
-  const getStatusClasses = (status) => {
-    switch (status) {
+  const getStatusClasses = (orderStatus) => {
+    switch (orderStatus) {
       case "DELIVERED":
         return "bg-green-50 text-green-700";
 
@@ -101,8 +125,8 @@ const AdminOrders = () => {
     }
   };
 
-  const getPaymentStatusClasses = (status) => {
-    switch (status) {
+  const getPaymentStatusClasses = (paymentStatusValue) => {
+    switch (paymentStatusValue) {
       case "PAID":
         return "bg-green-50 text-green-700";
 
@@ -152,6 +176,127 @@ const AdminOrders = () => {
           </button>
         </div>
 
+        {/* Filters */}
+        <section className="mb-6 rounded-2xl bg-white p-5 shadow-sm">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {/* Search */}
+            <div className="lg:col-span-2">
+              <label className="mb-2 block text-sm font-medium text-neutral-700">
+                Search Order
+              </label>
+
+              <input
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search by order number..."
+                className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none transition focus:border-neutral-900"
+              />
+            </div>
+
+            {/* Order Status */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-neutral-700">
+                Order Status
+              </label>
+
+              <select
+                value={status}
+                onChange={(event) => setStatus(event.target.value)}
+                className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-900"
+              >
+                <option value="">All Status</option>
+                <option value="PENDING">Pending</option>
+                <option value="CONFIRMED">Confirmed</option>
+                <option value="PROCESSING">Processing</option>
+                <option value="SHIPPED">Shipped</option>
+                <option value="OUT_FOR_DELIVERY">Out for Delivery</option>
+                <option value="DELIVERED">Delivered</option>
+                <option value="CANCELLED">Cancelled</option>
+                <option value="RETURN_REQUESTED">Return Requested</option>
+                <option value="RETURNED">Returned</option>
+                <option value="REFUND_INITIATED">Refund Initiated</option>
+                <option value="REFUNDED">Refunded</option>
+              </select>
+            </div>
+
+            {/* Payment Status */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-neutral-700">
+                Payment Status
+              </label>
+
+              <select
+                value={paymentStatus}
+                onChange={(event) => setPaymentStatus(event.target.value)}
+                className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-900"
+              >
+                <option value="">All Payments</option>
+                <option value="PENDING">Pending</option>
+                <option value="PAID">Paid</option>
+                <option value="FAILED">Failed</option>
+                <option value="REFUNDED">Refunded</option>
+              </select>
+            </div>
+
+            {/* Payment Method */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-neutral-700">
+                Payment Method
+              </label>
+
+              <select
+                value={paymentMethod}
+                onChange={(event) => setPaymentMethod(event.target.value)}
+                className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-900"
+              >
+                <option value="">All Methods</option>
+                <option value="COD">Cash on Delivery</option>
+                <option value="RAZORPAY">Razorpay</option>
+              </select>
+            </div>
+
+            {/* Start Date */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-neutral-700">
+                Start Date
+              </label>
+
+              <input
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+                className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none focus:border-neutral-900"
+              />
+            </div>
+
+            {/* End Date */}
+            <div>
+              <label className="mb-2 block text-sm font-medium text-neutral-700">
+                End Date
+              </label>
+
+              <input
+                type="date"
+                value={endDate}
+                onChange={(event) => setEndDate(event.target.value)}
+                className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none focus:border-neutral-900"
+              />
+            </div>
+          </div>
+
+          {/* Reset */}
+          <div className="mt-5 flex justify-end">
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="rounded-xl border border-neutral-300 bg-white px-5 py-2.5 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
+            >
+              Reset Filters
+            </button>
+          </div>
+        </section>
+
         {/* Order Count */}
         <div className="mb-4">
           <p className="text-sm text-neutral-500">
@@ -169,15 +314,15 @@ const AdminOrders = () => {
               </h2>
 
               <p className="mt-2 text-sm text-neutral-500">
-                There are currently no orders available.
+                Try changing your search or filters.
               </p>
 
               <button
                 type="button"
-                onClick={() => fetchOrders(1)}
-                className="mt-6 rounded-xl bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-neutral-800"
+                onClick={handleResetFilters}
+                className="mt-5 rounded-xl bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-neutral-800"
               >
-                Retry
+                Clear Filters
               </button>
             </div>
           ) : (
@@ -210,14 +355,12 @@ const AdminOrders = () => {
                         key={order._id}
                         className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
                       >
-                        {/* Order */}
                         <td className="px-6 py-5">
                           <p className="font-semibold text-neutral-900">
                             {order.orderNumber || order._id}
                           </p>
                         </td>
 
-                        {/* Customer */}
                         <td className="px-6 py-5">
                           <div>
                             <p className="font-medium text-neutral-900">
@@ -230,17 +373,14 @@ const AdminOrders = () => {
                           </div>
                         </td>
 
-                        {/* Amount */}
                         <td className="px-6 py-5 text-sm font-semibold text-neutral-900">
                           ₹{order.total ?? 0}
                         </td>
 
-                        {/* Payment Method */}
                         <td className="px-6 py-5 text-sm text-neutral-600">
                           {order.paymentMethod || "N/A"}
                         </td>
 
-                        {/* Payment Status */}
                         <td className="px-6 py-5">
                           <span
                             className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getPaymentStatusClasses(
@@ -251,7 +391,6 @@ const AdminOrders = () => {
                           </span>
                         </td>
 
-                        {/* Order Status */}
                         <td className="px-6 py-5">
                           <span
                             className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusClasses(
@@ -262,12 +401,10 @@ const AdminOrders = () => {
                           </span>
                         </td>
 
-                        {/* Date */}
                         <td className="px-6 py-5 text-sm text-neutral-600">
                           {formatDate(order.createdAt)}
                         </td>
 
-                        {/* Action */}
                         <td className="px-6 py-5">
                           <Link
                             to={`/admin/orders/${order._id}`}

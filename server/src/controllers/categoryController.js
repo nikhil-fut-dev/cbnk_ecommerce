@@ -95,7 +95,7 @@ export const createCategory = async (req, res) => {
         "cbnk/categories",
       );
 
-      image = uploadedImage.secure_url;
+      image = uploadedImage.url;
     }
 
     /* -----------------------------
@@ -438,7 +438,7 @@ export const updateCategory = async (req, res) => {
         "cbnk/categories",
       );
 
-      category.image = uploadedImage.secure_url;
+      category.image = uploadedImage.url;
     }
 
     await category.save();
