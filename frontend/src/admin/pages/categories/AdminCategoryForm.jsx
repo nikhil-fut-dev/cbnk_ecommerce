@@ -103,6 +103,14 @@ const AdminCategoryForm = () => {
     }
   }, [id]);
 
+  useEffect(() => {
+    return () => {
+      if (imagePreview.startsWith("blob:")) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
+
   // -----------------------------------------
   // Input change
   // -----------------------------------------
@@ -133,6 +141,11 @@ const AdminCategoryForm = () => {
       toast.error("Image size must be less than 5 MB");
       event.target.value = "";
       return;
+    }
+
+    // Previous local preview URL ko release karo
+    if (imagePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(imagePreview);
     }
 
     setImage(file);
