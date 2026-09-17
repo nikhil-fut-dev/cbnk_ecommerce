@@ -69,9 +69,13 @@ const Login = () => {
       if (response.success) {
         toast.success(response.message || "Login successful");
 
-        await fetchCurrentUser();
+        const currentUser = await fetchCurrentUser();
 
-        navigate("/");
+        if (currentUser?.role === "ADMIN") {
+          navigate("/admin");
+        } else {
+          navigate("/");
+        }
       }
     } catch (error) {
       const message =

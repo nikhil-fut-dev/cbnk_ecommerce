@@ -21,11 +21,14 @@ export const AuthProvider = ({ children }) => {
 
       if (response.success) {
         setUser(response.user);
+        return response.user;
       } else {
         setUser(null);
+        return null;
       }
     } catch (error) {
       setUser(null);
+      return null;
     } finally {
       setLoading(false);
     }

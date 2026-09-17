@@ -3,11 +3,13 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { Heart, Menu, Search, ShoppingBag, User, X } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
+import { useCart } from "../../context/CartContext";
 
 const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const { user, isAuthenticated, logout } = useAuth();
+  const { totalItems } = useCart();
 
   const navigate = useNavigate();
 
@@ -151,10 +153,16 @@ const Navbar = () => {
 
           <Link
             to="/cart"
-            aria-label="Shopping cart"
+            aria-label={`Shopping cart with ${totalItems} items`}
             className="relative rounded-full p-2.5 text-neutral-600 transition hover:bg-neutral-100 hover:text-neutral-950"
           >
             <ShoppingBag size={19} strokeWidth={1.8} />
+
+            {totalItems > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-neutral-950 px-1 text-[9px] font-bold leading-none text-white ring-2 ring-white">
+                {totalItems > 99 ? "99+" : totalItems}
+              </span>
+            )}
           </Link>
 
           <div className="mx-2 h-7 w-px bg-neutral-200" />
@@ -218,10 +226,16 @@ const Navbar = () => {
           <Link
             to="/cart"
             onClick={closeMobileMenu}
-            aria-label="Shopping cart"
-            className="rounded-full p-2.5 text-neutral-700 transition hover:bg-neutral-100"
+            aria-label={`Shopping cart with ${totalItems} items`}
+            className="relative rounded-full p-2.5 text-neutral-700 transition hover:bg-neutral-100"
           >
             <ShoppingBag size={20} strokeWidth={1.8} />
+
+            {totalItems > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-neutral-950 px-1 text-[9px] font-bold leading-none text-white ring-2 ring-white">
+                {totalItems > 99 ? "99+" : totalItems}
+              </span>
+            )}
           </Link>
 
           <button

@@ -14,6 +14,8 @@ import Checkout from "../pages/checkout/Checkout";
 import Orders from "../pages/account/Orders";
 import OrderDetails from "../pages/account/OrderDetails";
 import MyReviews from "../pages/account/MyReviews";
+import ForgotPassword from "../pages/auth/ForgotPassword";
+import ResetPassword from "../pages/auth/ResetPassword";
 
 const AppRoutes = () => {
   return (
@@ -23,6 +25,8 @@ const AppRoutes = () => {
       <Route path="/register" element={<Register />} />
       <Route path="/login" element={<Login />} />
       <Route path="/product/:slug" element={<ProductDetails />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/account" element={<Account />} />

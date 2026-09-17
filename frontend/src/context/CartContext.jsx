@@ -92,11 +92,7 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  const totalItems =
-    cart?.items?.reduce(
-      (total, item) => total + Number(item.quantity || 0),
-      0,
-    ) || 0;
+  const totalItems = cart?.items?.length || 0;
 
   return (
     <CartContext.Provider
