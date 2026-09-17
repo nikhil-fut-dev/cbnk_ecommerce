@@ -14,6 +14,8 @@ import AdminCoupons from "../pages/coupons/AdminCoupons";
 import AdminCouponForm from "../pages/coupons/AdminCouponForm";
 import AdminInventory from "../pages/inventory/AdminInventory";
 import AdminInventoryDetails from "../pages/inventory/AdminInventoryDetails";
+import AdminUsers from "../pages/users/AdminUsers";
+import AdminUserDetails from "../pages/users/AdminUserDetails";
 
 const AdminRoutes = () => {
   return (
@@ -21,36 +23,26 @@ const AdminRoutes = () => {
       <Route element={<AdminProtectedRoute />}>
         <Route element={<AdminLayout />}>
           <Route path="/admin" element={<AdminDashboard />} />
-
           <Route path="/admin/products" element={<AdminProducts />} />
-
           <Route path="/admin/products/:id" element={<AdminProductDetails />} />
-
           <Route path="/admin/orders" element={<AdminOrders />} />
-
           <Route path="/admin/orders/:id" element={<AdminOrderDetails />} />
-
           <Route path="/admin/categories" element={<AdminCategories />} />
-
           <Route path="/admin/categories/new" element={<AdminCategoryForm />} />
-
           <Route
             path="/admin/categories/:id/edit"
             element={<AdminCategoryForm />}
           />
-
           <Route path="/admin/coupons" element={<AdminCoupons />} />
-
           <Route path="/admin/coupons/new" element={<AdminCouponForm />} />
-
           <Route path="/admin/coupons/:id/edit" element={<AdminCouponForm />} />
-
           <Route path="/admin/inventory" element={<AdminInventory />} />
-
           <Route
             path="/admin/inventory/:id"
             element={<AdminInventoryDetails />}
           />
+          <Route path="/admin/users" element={<AdminUsers />} />
+          <Route path="/admin/users/:id" element={<AdminUserDetails />} />
         </Route>
       </Route>
     </Routes>
