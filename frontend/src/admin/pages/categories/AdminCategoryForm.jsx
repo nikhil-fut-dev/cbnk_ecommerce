@@ -344,7 +344,8 @@ const AdminCategoryForm = () => {
               </select>
 
               <p className="mt-1 text-xs text-neutral-400">
-                Categories support one level of nesting.
+                Leave empty for a root category. Only active root categories can
+                be selected as parents.
               </p>
             </div>
 
