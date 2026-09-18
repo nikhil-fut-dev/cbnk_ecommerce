@@ -26,7 +26,7 @@ const AppRoutes = () => {
     <Routes>
       {/* ==================== CUSTOMER ROUTES ==================== */}
 
-      <Route path="/" element={<Home />} />
+      <Route path="/" element={<home />} />
 
       <Route path="/shop" element={<Shop />} />
 
