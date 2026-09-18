@@ -1,290 +1,662 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import toast from "react-hot-toast";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { getAdminProductById } from "../../services/adminProductApi";
+import {
+  getAdminProductById,
+  deleteAdminProduct,
+  toggleAdminProductStatus,
+} from "../../services/adminProductApi";
 
 const AdminProductDetails = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
 
+  // =====================================================
+  // PRODUCT
+  // =====================================================
   const [product, setProduct] = useState(null);
-  const [loading, setLoading] = useState(true);
 
+  // =====================================================
+  // LOADING / ERROR
+  // =====================================================
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // =====================================================
+  // FETCH PRODUCT
+  // =====================================================
   const fetchProduct = async () => {
     try {
       setLoading(true);
+      setError("");
 
       const response = await getAdminProductById(id);
 
-      if (response.success) {
-        setProduct(response.product);
-      } else {
-        toast.error(response.message || "Unable to load product");
+      if (!response?.success) {
+        throw new Error(response?.message || "Failed to fetch product");
       }
-    } catch (error) {
-      const message = error.response?.data?.message || "Unable to load product";
 
-      toast.error(message);
+      // Backend admin product response may use `product`
+      // for the actual product object.
+      setProduct(response.product || response.data || null);
+    } catch (err) {
+      console.error("Failed to fetch product:", err);
+
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to load product",
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  // =====================================================
+  // INITIAL LOAD
+  // =====================================================
   useEffect(() => {
-    fetchProduct();
+    if (id) {
+      fetchProduct();
+    }
   }, [id]);
 
+  // =====================================================
+  // TOGGLE STATUS
+  // =====================================================
+  const handleToggleStatus = async () => {
+    if (!product) {
+      return;
+    }
+
+    const action = product.isActive ? "deactivate" : "activate";
+
+    const confirmed = window.confirm(
+      `Are you sure you want to ${action} "${product.name}"?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await toggleAdminProductStatus(product._id);
+
+      await fetchProduct();
+    } catch (err) {
+      console.error("Failed to update product status:", err);
+
+      alert(err?.response?.data?.message || "Failed to update product status");
+    }
+  };
+
+  // =====================================================
+  // ARCHIVE PRODUCT
+  // =====================================================
+  const handleArchiveProduct = async () => {
+    if (!product) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Are you sure you want to archive "${product.name}"?\n\nThis will deactivate the product and mark it as deleted.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteAdminProduct(product._id);
+
+      navigate("/admin/products");
+    } catch (err) {
+      console.error("Failed to archive product:", err);
+
+      alert(err?.response?.data?.message || "Failed to archive product");
+    }
+  };
+
+  // =====================================================
+  // LOADING
+  // =====================================================
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-neutral-100">
-        <div className="text-center">
-          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-neutral-300 border-t-neutral-900" />
-
-          <p className="mt-4 text-sm text-neutral-500">Loading product...</p>
-        </div>
-      </main>
+      <div className="p-6">
+        <p>Loading product...</p>
+      </div>
     );
   }
 
+  // =====================================================
+  // ERROR
+  // =====================================================
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {error}
+        </div>
+
+        <Link
+          to="/admin/products"
+          className="inline-flex rounded-lg border px-4 py-2 text-sm hover:bg-gray-50"
+        >
+          ← Back to Products
+        </Link>
+      </div>
+    );
+  }
+
+  // =====================================================
+  // PRODUCT NOT FOUND
+  // =====================================================
   if (!product) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-neutral-100 p-6">
-        <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
-          <h1 className="text-xl font-semibold text-neutral-900">
-            Product not found
-          </h1>
+      <div className="p-6">
+        <p className="mb-4 text-gray-500">Product not found.</p>
 
-          <p className="mt-2 text-sm text-neutral-500">
-            The requested product could not be loaded.
-          </p>
-
-          <Link
-            to="/admin/products"
-            className="mt-6 inline-flex rounded-xl bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-neutral-800"
-          >
-            Back to Products
-          </Link>
-        </div>
-      </main>
+        <Link
+          to="/admin/products"
+          className="inline-flex rounded-lg border px-4 py-2 text-sm hover:bg-gray-50"
+        >
+          ← Back to Products
+        </Link>
+      </div>
     );
   }
 
-  const inventory = product.inventory;
+  // =====================================================
+  // INVENTORY
+  // =====================================================
+  const inventory = product.inventory || {};
 
+  const availableStock =
+    product.availableStock ?? inventory.availableStock ?? product.stock ?? 0;
+
+  const totalStock = inventory.totalStock ?? product.stock ?? 0;
+
+  const reservedStock = inventory.reservedStock ?? 0;
+
+  const soldStock = inventory.soldStock ?? 0;
+
+  const inventoryVariants = inventory.variants || [];
+
+  // =====================================================
+  // PAGE
+  // =====================================================
   return (
-    <main className="min-h-screen bg-neutral-100 p-6 md:p-8">
-      <div className="mx-auto max-w-6xl">
-        {/* Header */}
-        <div className="mb-8">
+    <div className="p-6">
+      {/* =================================================
+          HEADER
+      ================================================= */}
+      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
           <Link
             to="/admin/products"
-            className="text-sm font-medium text-neutral-600 hover:text-neutral-900"
+            className="text-sm text-gray-500 hover:text-black"
           >
             ← Back to Products
           </Link>
 
-          <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-neutral-900">
-                {product.name}
-              </h1>
+          <h1 className="mt-3 text-2xl font-bold">{product.name}</h1>
 
-              {product.brand && (
-                <p className="mt-2 text-neutral-500">{product.brand}</p>
-              )}
-            </div>
-
-            <span
-              className={`inline-flex w-fit rounded-full px-4 py-2 text-sm font-semibold ${
-                product.isActive
-                  ? "bg-green-50 text-green-700"
-                  : "bg-neutral-200 text-neutral-700"
-              }`}
-            >
-              {product.isActive ? "Active" : "Inactive"}
-            </span>
-          </div>
+          <p className="mt-1 text-sm text-gray-500">
+            Product ID: {product._id}
+          </p>
         </div>
 
-        {/* Basic Information */}
-        <section className="rounded-2xl bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-neutral-900">
-            Product Information
-          </h2>
+        {/* ACTIONS */}
+        <div className="flex flex-wrap gap-2">
+          <Link
+            to={`/admin/products/${product._id}/edit`}
+            className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-gray-50"
+          >
+            Edit Product
+          </Link>
 
-          <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <p className="text-sm text-neutral-500">Price</p>
+          {!product.isDeleted && (
+            <>
+              <button
+                type="button"
+                onClick={handleToggleStatus}
+                className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-gray-50"
+              >
+                {product.isActive ? "Deactivate" : "Activate"}
+              </button>
 
-              <p className="mt-1 text-lg font-semibold text-neutral-900">
-                ₹{product.price ?? 0}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-sm text-neutral-500">Category</p>
-
-              <p className="mt-1 font-medium text-neutral-900">
-                {product.category?.name || "Uncategorized"}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-sm text-neutral-500">Sub-category</p>
-
-              <p className="mt-1 font-medium text-neutral-900">
-                {product.subCategory?.name || "N/A"}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-sm text-neutral-500">Gender</p>
-
-              <p className="mt-1 font-medium text-neutral-900">
-                {product.gender || "N/A"}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-sm text-neutral-500">Available Stock</p>
-
-              <p className="mt-1 text-lg font-semibold text-neutral-900">
-                {product.availableStock ?? 0}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-sm text-neutral-500">Product ID</p>
-
-              <p className="mt-1 break-all text-sm font-medium text-neutral-700">
-                {product._id}
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Inventory */}
-        <section className="mt-6 rounded-2xl bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-neutral-900">Inventory</h2>
-
-          {inventory ? (
-            <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <p className="text-sm text-neutral-500">Total Stock</p>
-
-                <p className="mt-1 text-2xl font-bold text-neutral-900">
-                  {inventory.totalStock ?? 0}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-sm text-neutral-500">Reserved Stock</p>
-
-                <p className="mt-1 text-2xl font-bold text-neutral-900">
-                  {inventory.reservedStock ?? 0}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-sm text-neutral-500">Sold Stock</p>
-
-                <p className="mt-1 text-2xl font-bold text-neutral-900">
-                  {inventory.soldStock ?? 0}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-sm text-neutral-500">Low Stock Threshold</p>
-
-                <p className="mt-1 text-2xl font-bold text-neutral-900">
-                  {inventory.lowStockThreshold ?? 0}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <p className="mt-5 text-sm text-neutral-500">
-              Inventory information is not available.
-            </p>
+              <button
+                type="button"
+                onClick={handleArchiveProduct}
+                className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+              >
+                Archive
+              </button>
+            </>
           )}
-        </section>
 
-        {/* Variants */}
-        <section className="mt-6 rounded-2xl bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-neutral-900">Variants</h2>
-
-          {!inventory?.variants?.length ? (
-            <p className="mt-5 text-sm text-neutral-500">
-              No inventory variants available.
-            </p>
-          ) : (
-            <div className="mt-5 overflow-x-auto">
-              <table className="w-full min-w-[700px] text-left">
-                <thead>
-                  <tr className="border-b border-neutral-200 text-sm text-neutral-500">
-                    <th className="pb-3 font-medium">SKU</th>
-
-                    <th className="pb-3 font-medium">Size</th>
-
-                    <th className="pb-3 font-medium">Color</th>
-
-                    <th className="pb-3 font-medium">Stock</th>
-
-                    <th className="pb-3 font-medium">Reserved</th>
-
-                    <th className="pb-3 font-medium">Sold</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {inventory.variants.map((variant) => (
-                    <tr
-                      key={variant.variant || variant._id || variant.SKU}
-                      className="border-b border-neutral-100 last:border-0"
-                    >
-                      <td className="py-4 text-sm font-medium text-neutral-900">
-                        {variant.SKU || "N/A"}
-                      </td>
-
-                      <td className="py-4 text-sm text-neutral-600">
-                        {variant.size || "N/A"}
-                      </td>
-
-                      <td className="py-4 text-sm text-neutral-600">
-                        {variant.color || "N/A"}
-                      </td>
-
-                      <td className="py-4 text-sm font-semibold text-neutral-900">
-                        {variant.stock ?? 0}
-                      </td>
-
-                      <td className="py-4 text-sm text-neutral-600">
-                        {variant.reservedStock ?? 0}
-                      </td>
-
-                      <td className="py-4 text-sm text-neutral-600">
-                        {variant.soldStock ?? 0}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-
-        {/* Refresh */}
-        <div className="mt-6 flex justify-end">
           <button
             type="button"
             onClick={fetchProduct}
-            disabled={loading}
-            className="rounded-xl border border-neutral-300 bg-white px-5 py-2.5 text-sm font-semibold text-neutral-800 shadow-sm hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-gray-50"
           >
-            {loading ? "Refreshing..." : "Refresh Product"}
+            Refresh
           </button>
         </div>
       </div>
-    </main>
+
+      {/* =================================================
+          STATUS
+      ================================================= */}
+      <div className="mb-6 flex flex-wrap gap-2">
+        <span
+          className={`rounded-full px-3 py-1 text-xs font-medium ${
+            product.isDeleted
+              ? "bg-red-100 text-red-700"
+              : product.isActive
+                ? "bg-green-100 text-green-700"
+                : "bg-gray-100 text-gray-700"
+          }`}
+        >
+          {product.isDeleted
+            ? "Archived"
+            : product.isActive
+              ? "Active"
+              : "Inactive"}
+        </span>
+
+        {product.isFeatured && (
+          <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-medium text-purple-700">
+            Featured
+          </span>
+        )}
+
+        {product.isNewArrival && (
+          <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">
+            New Arrival
+          </span>
+        )}
+
+        {product.isBestSeller && (
+          <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-medium text-orange-700">
+            Best Seller
+          </span>
+        )}
+      </div>
+
+      {/* =================================================
+          MAIN GRID
+      ================================================= */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* =================================================
+            IMAGES
+        ================================================= */}
+        <div className="rounded-xl border bg-white p-5 shadow-sm lg:col-span-1">
+          <h2 className="mb-4 text-lg font-semibold">Product Images</h2>
+
+          {product.images?.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3">
+              {product.images.map((image, index) => (
+                <div
+                  key={image._id || image.publicId || index}
+                  className="overflow-hidden rounded-lg border"
+                >
+                  <img
+                    src={image.url}
+                    alt={image.alt || `${product.name} ${index + 1}`}
+                    className="aspect-square w-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex aspect-square items-center justify-center rounded-lg border bg-gray-50 text-sm text-gray-400">
+              No images available
+            </div>
+          )}
+        </div>
+
+        {/* =================================================
+            PRODUCT INFORMATION
+        ================================================= */}
+        <div className="rounded-xl border bg-white p-5 shadow-sm lg:col-span-2">
+          <h2 className="mb-5 text-lg font-semibold">Product Information</h2>
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            {/* SKU */}
+            <div>
+              <p className="text-xs text-gray-500">SKU</p>
+              <p className="mt-1 font-medium">{product.SKU || "-"}</p>
+            </div>
+
+            {/* BRAND */}
+            <div>
+              <p className="text-xs text-gray-500">Brand</p>
+              <p className="mt-1 font-medium">{product.brand || "CBNK"}</p>
+            </div>
+
+            {/* CATEGORY */}
+            <div>
+              <p className="text-xs text-gray-500">Category</p>
+              <p className="mt-1 font-medium">
+                {product.category?.name || product.category?.title || "-"}
+              </p>
+            </div>
+
+            {/* SUB CATEGORY */}
+            <div>
+              <p className="text-xs text-gray-500">Sub Category</p>
+              <p className="mt-1 font-medium">
+                {product.subCategory?.name || product.subCategory?.title || "-"}
+              </p>
+            </div>
+
+            {/* GENDER */}
+            <div>
+              <p className="text-xs text-gray-500">Gender</p>
+              <p className="mt-1 font-medium">{product.gender || "-"}</p>
+            </div>
+
+            {/* AGE GROUP */}
+            <div>
+              <p className="text-xs text-gray-500">Age Group</p>
+              <p className="mt-1 font-medium">{product.ageGroup || "-"}</p>
+            </div>
+
+            {/* PRICE */}
+            <div>
+              <p className="text-xs text-gray-500">Price</p>
+              <p className="mt-1 text-lg font-semibold">
+                ₹{Number(product.price || 0).toLocaleString("en-IN")}
+              </p>
+            </div>
+
+            {/* COMPARE PRICE */}
+            <div>
+              <p className="text-xs text-gray-500">Compare At Price</p>
+              <p className="mt-1 font-medium">
+                {product.compareAtPrice
+                  ? `₹${Number(product.compareAtPrice).toLocaleString("en-IN")}`
+                  : "-"}
+              </p>
+            </div>
+
+            {/* DISCOUNT */}
+            <div>
+              <p className="text-xs text-gray-500">Discount</p>
+              <p className="mt-1 font-medium">{product.discount ?? 0}%</p>
+            </div>
+
+            {/* MATERIAL */}
+            <div>
+              <p className="text-xs text-gray-500">Material</p>
+              <p className="mt-1 font-medium">{product.material || "-"}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* =================================================
+          DESCRIPTION
+      ================================================= */}
+      <div className="mt-6 rounded-xl border bg-white p-5 shadow-sm">
+        <h2 className="mb-4 text-lg font-semibold">Description</h2>
+
+        <p className="whitespace-pre-wrap text-sm leading-6 text-gray-600">
+          {product.description || "No description available."}
+        </p>
+
+        {product.shortDescription && (
+          <div className="mt-5 border-t pt-5">
+            <p className="mb-1 text-xs font-medium text-gray-500">
+              Short Description
+            </p>
+
+            <p className="text-sm text-gray-600">{product.shortDescription}</p>
+          </div>
+        )}
+      </div>
+
+      {/* =================================================
+          SIZES / COLORS / TAGS
+      ================================================= */}
+      <div className="mt-6 grid gap-6 md:grid-cols-3">
+        {/* SIZES */}
+        <div className="rounded-xl border bg-white p-5 shadow-sm">
+          <h2 className="mb-4 text-lg font-semibold">Sizes</h2>
+
+          <div className="flex flex-wrap gap-2">
+            {product.sizes?.length > 0 ? (
+              product.sizes.map((size) => (
+                <span
+                  key={size}
+                  className="rounded-lg border px-3 py-1.5 text-sm"
+                >
+                  {size}
+                </span>
+              ))
+            ) : (
+              <p className="text-sm text-gray-400">No sizes</p>
+            )}
+          </div>
+        </div>
+
+        {/* COLORS */}
+        <div className="rounded-xl border bg-white p-5 shadow-sm">
+          <h2 className="mb-4 text-lg font-semibold">Colors</h2>
+
+          <div className="flex flex-wrap gap-2">
+            {product.colors?.length > 0 ? (
+              product.colors.map((color) => (
+                <span
+                  key={color}
+                  className="rounded-lg border px-3 py-1.5 text-sm"
+                >
+                  {color}
+                </span>
+              ))
+            ) : (
+              <p className="text-sm text-gray-400">No colors</p>
+            )}
+          </div>
+        </div>
+
+        {/* TAGS */}
+        <div className="rounded-xl border bg-white p-5 shadow-sm">
+          <h2 className="mb-4 text-lg font-semibold">Tags</h2>
+
+          <div className="flex flex-wrap gap-2">
+            {product.tags?.length > 0 ? (
+              product.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm"
+                >
+                  #{tag}
+                </span>
+              ))
+            ) : (
+              <p className="text-sm text-gray-400">No tags</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* =================================================
+          INVENTORY SUMMARY
+      ================================================= */}
+      <div className="mt-6">
+        <h2 className="mb-4 text-lg font-semibold">Inventory</h2>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* AVAILABLE */}
+          <div className="rounded-xl border bg-white p-5 shadow-sm">
+            <p className="text-sm text-gray-500">Available Stock</p>
+
+            <p className="mt-2 text-2xl font-bold">{availableStock}</p>
+          </div>
+
+          {/* TOTAL */}
+          <div className="rounded-xl border bg-white p-5 shadow-sm">
+            <p className="text-sm text-gray-500">Total Stock</p>
+
+            <p className="mt-2 text-2xl font-bold">{totalStock}</p>
+          </div>
+
+          {/* RESERVED */}
+          <div className="rounded-xl border bg-white p-5 shadow-sm">
+            <p className="text-sm text-gray-500">Reserved</p>
+
+            <p className="mt-2 text-2xl font-bold">{reservedStock}</p>
+          </div>
+
+          {/* SOLD */}
+          <div className="rounded-xl border bg-white p-5 shadow-sm">
+            <p className="text-sm text-gray-500">Sold</p>
+
+            <p className="mt-2 text-2xl font-bold">{soldStock}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* =================================================
+          VARIANTS
+      ================================================= */}
+      <div className="mt-6 rounded-xl border bg-white shadow-sm">
+        <div className="border-b p-5">
+          <h2 className="text-lg font-semibold">Product Variants</h2>
+        </div>
+
+        {product.variants?.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left font-semibold">Size</th>
+
+                  <th className="px-4 py-3 text-left font-semibold">Color</th>
+
+                  <th className="px-4 py-3 text-left font-semibold">SKU</th>
+
+                  <th className="px-4 py-3 text-left font-semibold">Price</th>
+
+                  <th className="px-4 py-3 text-left font-semibold">Stock</th>
+
+                  <th className="px-4 py-3 text-left font-semibold">Status</th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y">
+                {product.variants.map((variant, index) => {
+                  const inventoryVariant = inventoryVariants.find(
+                    (item) =>
+                      item.variant?.toString() === variant._id?.toString() ||
+                      item.SKU === variant.SKU,
+                  );
+
+                  return (
+                    <tr key={variant._id || index}>
+                      <td className="px-4 py-3">{variant.size || "-"}</td>
+
+                      <td className="px-4 py-3">{variant.color || "-"}</td>
+
+                      <td className="px-4 py-3">{variant.SKU || "-"}</td>
+
+                      <td className="px-4 py-3">
+                        {variant.price != null
+                          ? `₹${Number(variant.price).toLocaleString("en-IN")}`
+                          : "Product price"}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        {inventoryVariant?.stock ?? variant.stock ?? 0}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs ${
+                            variant.isActive
+                              ? "bg-green-100 text-green-700"
+                              : "bg-gray-100 text-gray-700"
+                          }`}
+                        >
+                          {variant.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-6 text-sm text-gray-400">
+            No variants configured.
+          </div>
+        )}
+      </div>
+
+      {/* =================================================
+          SPECIFICATIONS
+      ================================================= */}
+      {product.specifications &&
+        Object.keys(product.specifications).length > 0 && (
+          <div className="mt-6 rounded-xl border bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-lg font-semibold">Specifications</h2>
+
+            <div className="divide-y">
+              {Object.entries(product.specifications).map(([key, value]) => (
+                <div key={key} className="grid gap-2 py-3 sm:grid-cols-2">
+                  <span className="text-sm font-medium">{key}</span>
+
+                  <span className="text-sm text-gray-600">
+                    {typeof value === "object"
+                      ? JSON.stringify(value)
+                      : String(value)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+      {/* =================================================
+          META INFORMATION
+      ================================================= */}
+      <div className="mt-6 rounded-xl border bg-white p-5 shadow-sm">
+        <h2 className="mb-4 text-lg font-semibold">Meta Information</h2>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <p className="text-xs text-gray-500">Created</p>
+            <p className="mt-1 text-sm">
+              {product.createdAt
+                ? new Date(product.createdAt).toLocaleString("en-IN")
+                : "-"}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-xs text-gray-500">Updated</p>
+            <p className="mt-1 text-sm">
+              {product.updatedAt
+                ? new Date(product.updatedAt).toLocaleString("en-IN")
+                : "-"}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-xs text-gray-500">Product ID</p>
+            <p className="mt-1 break-all text-sm">{product._id}</p>
+          </div>
+
+          <div>
+            <p className="text-xs text-gray-500">Slug</p>
+            <p className="mt-1 break-all text-sm">{product.slug || "-"}</p>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 

@@ -1,77 +1,147 @@
 import { useEffect, useState } from "react";
-import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
 
 import {
   getAdminProducts,
+  deleteAdminProduct,
   toggleAdminProductStatus,
 } from "../../services/adminProductApi";
 
+import { getAdminCategories } from "../../services/adminCategoryApi";
+
 const AdminProducts = () => {
+  // =====================================================
+  // PRODUCTS
+  // =====================================================
   const [products, setProducts] = useState([]);
 
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 20,
-    totalProducts: 0,
-    totalPages: 0,
-    hasNext: false,
-    hasPrev: false,
-  });
+  // =====================================================
+  // CATEGORIES
+  // =====================================================
+  const [categories, setCategories] = useState([]);
 
+  // =====================================================
+  // LOADING / ERROR
+  // =====================================================
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  // Filters
+  // =====================================================
+  // FILTERS
+  // =====================================================
   const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("");
   const [status, setStatus] = useState("");
   const [isDeleted, setIsDeleted] = useState("");
   const [sort, setSort] = useState("newest");
 
-  const fetchProducts = async (page = 1) => {
+  // =====================================================
+  // PAGINATION
+  // =====================================================
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 1,
+  });
+
+  // =====================================================
+  // FETCH CATEGORIES
+  // =====================================================
+  const fetchCategories = async () => {
+    try {
+      const response = await getAdminCategories({
+        page: 1,
+        limit: 100,
+      });
+
+      if (response?.success) {
+        setCategories(response.data || []);
+      }
+    } catch (err) {
+      console.error("Failed to load categories:", err);
+    }
+  };
+
+  // =====================================================
+  // FETCH PRODUCTS
+  // =====================================================
+  const fetchProducts = async () => {
     try {
       setLoading(true);
+      setError("");
 
       const response = await getAdminProducts({
         search,
+        category,
         status,
         isDeleted,
         page,
-        limit: pagination.limit,
+        limit: 20,
         sort,
       });
 
-      if (response.success) {
-        setProducts(response.products || []);
-        setPagination(response.pagination);
-      } else {
-        toast.error(response.message || "Unable to load products");
+      if (!response?.success) {
+        throw new Error(response?.message || "Failed to fetch products");
       }
-    } catch (error) {
-      const message =
-        error.response?.data?.message || "Unable to load admin products";
 
-      toast.error(message);
+      setProducts(response.products || []);
+
+      setPagination(
+        response.pagination || {
+          page: 1,
+          limit: 20,
+          total: 0,
+          totalPages: 1,
+        },
+      );
+    } catch (err) {
+      console.error("Failed to fetch products:", err);
+
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to load products",
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  // =====================================================
+  // INITIAL LOAD
+  // =====================================================
   useEffect(() => {
-    fetchProducts(1);
-  }, [search, status, isDeleted, sort]);
+    fetchCategories();
+  }, []);
 
-  const handlePrevious = () => {
-    if (pagination.hasPrev) {
-      fetchProducts(pagination.page - 1);
-    }
+  // =====================================================
+  // LOAD PRODUCTS WHEN FILTER / PAGE CHANGES
+  // =====================================================
+  useEffect(() => {
+    fetchProducts();
+  }, [search, category, status, isDeleted, sort, page]);
+
+  // =====================================================
+  // SEARCH
+  // =====================================================
+  const handleSearchChange = (event) => {
+    setSearch(event.target.value);
+    setPage(1);
   };
 
-  const handleNext = () => {
-    if (pagination.hasNext) {
-      fetchProducts(pagination.page + 1);
-    }
+  // =====================================================
+  // FILTER CHANGE
+  // =====================================================
+  const handleFilterChange = (setter) => (event) => {
+    setter(event.target.value);
+    setPage(1);
   };
 
+  // =====================================================
+  // TOGGLE PRODUCT STATUS
+  // =====================================================
   const handleToggleStatus = async (product) => {
     const action = product.isActive ? "deactivate" : "activate";
 
@@ -84,310 +154,416 @@ const AdminProducts = () => {
     }
 
     try {
-      const response = await toggleAdminProductStatus(product._id);
+      await toggleAdminProductStatus(product._id);
 
-      if (response.success) {
-        toast.success(response.message || "Product status updated");
+      await fetchProducts();
+    } catch (err) {
+      console.error("Failed to toggle product status:", err);
 
-        await fetchProducts(pagination.page);
-      } else {
-        toast.error(response.message || "Unable to update product status");
-      }
-    } catch (error) {
-      const message =
-        error.response?.data?.message || "Unable to update product status";
-
-      toast.error(message);
+      alert(err?.response?.data?.message || "Failed to update product status");
     }
   };
 
+  // =====================================================
+  // ARCHIVE PRODUCT
+  // =====================================================
+  const handleArchiveProduct = async (product) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to archive "${product.name}"?\n\nThis will deactivate the product and mark it as deleted.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteAdminProduct(product._id);
+
+      await fetchProducts();
+    } catch (err) {
+      console.error("Failed to archive product:", err);
+
+      alert(err?.response?.data?.message || "Failed to archive product");
+    }
+  };
+
+  // =====================================================
+  // RESET FILTERS
+  // =====================================================
   const handleResetFilters = () => {
     setSearch("");
+    setCategory("");
     setStatus("");
     setIsDeleted("");
     setSort("newest");
+    setPage(1);
   };
 
+  // =====================================================
+  // PAGE CHANGE
+  // =====================================================
+  const handlePreviousPage = () => {
+    if (page > 1) {
+      setPage((currentPage) => currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (page < pagination.totalPages) {
+      setPage((currentPage) => currentPage + 1);
+    }
+  };
+
+  // =====================================================
+  // LOADING
+  // =====================================================
   if (loading && products.length === 0) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-neutral-100">
-        <div className="text-center">
-          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-neutral-300 border-t-neutral-900" />
-
-          <p className="mt-4 text-sm text-neutral-500">Loading products...</p>
-        </div>
-      </main>
+      <div className="p-6">
+        <p>Loading products...</p>
+      </div>
     );
   }
 
+  // =====================================================
+  // PAGE
+  // =====================================================
   return (
-    <main className="min-h-screen bg-neutral-100 p-6 md:p-8">
-      <div className="mx-auto max-w-7xl">
-        {/* Header */}
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-neutral-900">Products</h1>
+    <div className="p-6">
+      {/* =================================================
+          HEADER
+      ================================================= */}
+      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Products</h1>
 
-            <p className="mt-2 text-neutral-600">
-              Manage products in your CBNK store.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => fetchProducts(pagination.page)}
-            disabled={loading}
-            className="rounded-xl border border-neutral-300 bg-white px-5 py-2.5 text-sm font-semibold text-neutral-800 shadow-sm hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {loading ? "Refreshing..." : "Refresh"}
-          </button>
-        </div>
-
-        {/* Filters */}
-        <section className="mb-6 rounded-2xl bg-white p-5 shadow-sm">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {/* Search */}
-            <div className="lg:col-span-2">
-              <label className="mb-2 block text-sm font-medium text-neutral-700">
-                Search
-              </label>
-
-              <input
-                type="text"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search by name, SKU or brand..."
-                className="w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none transition focus:border-neutral-900"
-              />
-            </div>
-
-            {/* Status */}
-            <div>
-              <label className="mb-2 block text-sm font-medium text-neutral-700">
-                Status
-              </label>
-
-              <select
-                value={status}
-                onChange={(event) => setStatus(event.target.value)}
-                className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-900"
-              >
-                <option value="">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
-
-            {/* Sort */}
-            <div>
-              <label className="mb-2 block text-sm font-medium text-neutral-700">
-                Sort
-              </label>
-
-              <select
-                value={sort}
-                onChange={(event) => setSort(event.target.value)}
-                className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-900"
-              >
-                <option value="newest">Newest</option>
-                <option value="oldest">Oldest</option>
-                <option value="price-low">Price: Low to High</option>
-                <option value="price-high">Price: High to Low</option>
-                <option value="name-asc">Name: A to Z</option>
-                <option value="name-desc">Name: Z to A</option>
-              </select>
-            </div>
-
-            {/* Deleted */}
-            <div>
-              <label className="mb-2 block text-sm font-medium text-neutral-700">
-                Deleted Products
-              </label>
-
-              <select
-                value={isDeleted}
-                onChange={(event) => setIsDeleted(event.target.value)}
-                className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-900"
-              >
-                <option value="">All Products</option>
-                <option value="false">Not Deleted</option>
-                <option value="true">Deleted</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Reset */}
-          <div className="mt-5 flex justify-end">
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              className="rounded-xl border border-neutral-300 bg-white px-5 py-2.5 text-sm font-semibold text-neutral-700 hover:bg-neutral-50"
-            >
-              Reset Filters
-            </button>
-          </div>
-        </section>
-
-        {/* Product count */}
-        <div className="mb-4">
-          <p className="text-sm text-neutral-500">
-            {pagination.totalProducts} product
-            {pagination.totalProducts !== 1 ? "s" : ""} found
+          <p className="mt-1 text-sm text-gray-500">
+            Manage your CBNK products, inventory status, activation and archived
+            products.
           </p>
         </div>
 
-        {/* Product Table */}
-        <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
-          {products.length === 0 ? (
-            <div className="p-10 text-center">
-              <h2 className="text-xl font-semibold text-neutral-900">
-                No products found
-              </h2>
+        {/* ADD PRODUCT */}
+        <Link
+          to="/admin/products/new"
+          className="inline-flex items-center justify-center rounded-lg bg-black px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800"
+        >
+          + Add Product
+        </Link>
+      </div>
 
-              <p className="mt-2 text-sm text-neutral-500">
-                Try changing your search or filters.
-              </p>
+      {/* =================================================
+          ERROR
+      ================================================= */}
+      {error && (
+        <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className="mt-5 rounded-xl bg-neutral-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-neutral-800"
-              >
-                Clear Filters
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[900px] text-left">
-                  <thead>
-                    <tr className="border-b border-neutral-200 bg-neutral-50 text-sm text-neutral-500">
-                      <th className="px-6 py-4 font-medium">Product</th>
+      {/* =================================================
+          FILTERS
+      ================================================= */}
+      <div className="mb-6 rounded-xl border bg-white p-4 shadow-sm">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          {/* SEARCH */}
+          <div>
+            <label className="mb-1 block text-sm font-medium">Search</label>
 
-                      <th className="px-6 py-4 font-medium">SKU</th>
+            <input
+              type="text"
+              value={search}
+              onChange={handleSearchChange}
+              placeholder="Search product..."
+              className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-black"
+            />
+          </div>
 
-                      <th className="px-6 py-4 font-medium">Category</th>
+          {/* CATEGORY */}
+          <div>
+            <label className="mb-1 block text-sm font-medium">Category</label>
 
-                      <th className="px-6 py-4 font-medium">Price</th>
+            <select
+              value={category}
+              onChange={handleFilterChange(setCategory)}
+              className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-black"
+            >
+              <option value="">All Categories</option>
 
-                      <th className="px-6 py-4 font-medium">Stock</th>
+              {categories.map((item) => (
+                <option key={item._id} value={item._id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-                      <th className="px-6 py-4 font-medium">Status</th>
-                    </tr>
-                  </thead>
+          {/* STATUS */}
+          <div>
+            <label className="mb-1 block text-sm font-medium">Status</label>
 
-                  <tbody>
-                    {products.map((product) => (
-                      <tr
-                        key={product._id}
-                        className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
-                      >
-                        {/* Product */}
-                        <td className="px-6 py-5">
-                          <Link
-                            to={`/admin/products/${product._id}`}
-                            className="group"
-                          >
-                            <p className="font-semibold text-neutral-900 group-hover:text-neutral-600">
-                              {product.name}
-                            </p>
+            <select
+              value={status}
+              onChange={handleFilterChange(setStatus)}
+              className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-black"
+            >
+              <option value="">All Status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
 
-                            {product.brand && (
-                              <p className="mt-1 text-sm text-neutral-500">
-                                {product.brand}
-                              </p>
-                            )}
-                          </Link>
-                        </td>
+          {/* DELETED */}
+          <div>
+            <label className="mb-1 block text-sm font-medium">Deleted</label>
 
-                        {/* SKU */}
-                        <td className="px-6 py-5 text-sm text-neutral-600">
-                          {product.SKU || "N/A"}
-                        </td>
+            <select
+              value={isDeleted}
+              onChange={handleFilterChange(setIsDeleted)}
+              className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-black"
+            >
+              <option value="">All Products</option>
+              <option value="true">Archived</option>
+              <option value="false">Not Archived</option>
+            </select>
+          </div>
 
-                        {/* Category */}
-                        <td className="px-6 py-5 text-sm text-neutral-600">
-                          {product.category?.name || "Uncategorized"}
-                        </td>
+          {/* SORT */}
+          <div>
+            <label className="mb-1 block text-sm font-medium">Sort</label>
 
-                        {/* Price */}
-                        <td className="px-6 py-5 text-sm font-semibold text-neutral-900">
-                          ₹{product.price ?? 0}
-                        </td>
+            <select
+              value={sort}
+              onChange={handleFilterChange(setSort)}
+              className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-black"
+            >
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+              <option value="price-low">Price: Low to High</option>
+              <option value="price-high">Price: High to Low</option>
+              <option value="name-asc">Name: A-Z</option>
+              <option value="name-desc">Name: Z-A</option>
+            </select>
+          </div>
+        </div>
 
-                        {/* Stock */}
-                        <td className="px-6 py-5">
-                          <span className="text-sm font-semibold text-neutral-900">
-                            {product.availableStock ?? 0}
-                          </span>
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-6 py-5">
-                          <div className="flex flex-col items-start gap-2">
-                            <span
-                              className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                                product.isActive
-                                  ? "bg-green-50 text-green-700"
-                                  : "bg-neutral-100 text-neutral-600"
-                              }`}
-                            >
-                              {product.isActive ? "Active" : "Inactive"}
-                            </span>
-
-                            {!product.isDeleted && (
-                              <button
-                                type="button"
-                                onClick={() => handleToggleStatus(product)}
-                                disabled={loading}
-                                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                                  product.isActive
-                                    ? "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-                                    : "border border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
-                                }`}
-                              >
-                                {product.isActive ? "Deactivate" : "Activate"}
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Pagination */}
-              <div className="flex flex-col gap-4 border-t border-neutral-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-neutral-500">
-                  Page {pagination.page} of {pagination.totalPages || 1}
-                </p>
-
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={handlePrevious}
-                    disabled={!pagination.hasPrev || loading}
-                    className="rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Previous
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleNext}
-                    disabled={!pagination.hasNext || loading}
-                    className="rounded-xl bg-neutral-900 px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
+        {/* RESET */}
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={handleResetFilters}
+            className="rounded-lg border px-4 py-2 text-sm hover:bg-gray-50"
+          >
+            Reset Filters
+          </button>
         </div>
       </div>
-    </main>
+
+      {/* =================================================
+          PRODUCT TABLE
+      ================================================= */}
+      <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="border-b bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold">Product</th>
+
+                <th className="px-4 py-3 text-left font-semibold">SKU</th>
+
+                <th className="px-4 py-3 text-left font-semibold">Category</th>
+
+                <th className="px-4 py-3 text-left font-semibold">Price</th>
+
+                <th className="px-4 py-3 text-left font-semibold">Stock</th>
+
+                <th className="px-4 py-3 text-left font-semibold">Status</th>
+
+                <th className="px-4 py-3 text-right font-semibold">Actions</th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y">
+              {products.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan="7"
+                    className="px-4 py-10 text-center text-gray-500"
+                  >
+                    No products found.
+                  </td>
+                </tr>
+              ) : (
+                products.map((product) => (
+                  <tr key={product._id} className="hover:bg-gray-50">
+                    {/* PRODUCT */}
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-3">
+                        {product.images?.[0]?.url ? (
+                          <img
+                            src={product.images[0].url}
+                            alt={product.images[0].alt || product.name}
+                            className="h-12 w-12 rounded-lg border object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-12 w-12 items-center justify-center rounded-lg border bg-gray-100 text-xs text-gray-400">
+                            No Image
+                          </div>
+                        )}
+
+                        <div>
+                          <p className="font-medium">{product.name}</p>
+
+                          <p className="text-xs text-gray-500">
+                            {product.brand || "CBNK"}
+                          </p>
+
+                          {product.isDeleted && (
+                            <span className="mt-1 inline-block text-xs text-red-600">
+                              Archived
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* SKU */}
+                    <td className="px-4 py-4">{product.SKU || "-"}</td>
+
+                    {/* CATEGORY */}
+                    <td className="px-4 py-4">
+                      {product.category?.name || product.category?.title || "-"}
+                    </td>
+
+                    {/* PRICE */}
+                    <td className="px-4 py-4">
+                      ₹{Number(product.price || 0).toLocaleString("en-IN")}
+                    </td>
+
+                    {/* STOCK */}
+                    <td className="px-4 py-4">
+                      <div>
+                        <span className="font-medium">
+                          {product.availableStock ?? product.stock ?? 0}
+                        </span>
+
+                        {product.inventory?.lowStock && (
+                          <span className="ml-2 text-xs text-orange-600">
+                            Low Stock
+                          </span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* STATUS */}
+                    <td className="px-4 py-4">
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                          product.isDeleted
+                            ? "bg-red-100 text-red-700"
+                            : product.isActive
+                              ? "bg-green-100 text-green-700"
+                              : "bg-gray-100 text-gray-700"
+                        }`}
+                      >
+                        {product.isDeleted
+                          ? "Archived"
+                          : product.isActive
+                            ? "Active"
+                            : "Inactive"}
+                      </span>
+                    </td>
+
+                    {/* ACTIONS */}
+                    <td className="px-4 py-4">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {/* VIEW */}
+                        <Link
+                          to={`/admin/products/${product._id}`}
+                          className="rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-gray-50"
+                        >
+                          View
+                        </Link>
+
+                        {/* EDIT */}
+                        <Link
+                          to={`/admin/products/${product._id}/edit`}
+                          className="rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-gray-50"
+                        >
+                          Edit
+                        </Link>
+
+                        {/* STATUS */}
+                        {!product.isDeleted && (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStatus(product)}
+                            className="rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-gray-50"
+                          >
+                            {product.isActive ? "Deactivate" : "Activate"}
+                          </button>
+                        )}
+
+                        {/* ARCHIVE */}
+                        {!product.isDeleted && (
+                          <button
+                            type="button"
+                            onClick={() => handleArchiveProduct(product)}
+                            className="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"
+                          >
+                            Archive
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* =================================================
+            PAGINATION
+        ================================================= */}
+        <div className="flex flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-gray-500">
+            Page {pagination.page || page} of {pagination.totalPages || 1}
+            {" • "}
+            {pagination.total || products.length} products
+          </p>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handlePreviousPage}
+              disabled={page <= 1 || loading}
+              className="rounded-lg border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Previous
+            </button>
+
+            <button
+              type="button"
+              onClick={handleNextPage}
+              disabled={page >= (pagination.totalPages || 1) || loading}
+              className="rounded-lg border px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* =================================================
+          REFRESHING INDICATOR
+      ================================================= */}
+      {loading && products.length > 0 && (
+        <p className="mt-3 text-right text-xs text-gray-500">
+          Updating products...
+        </p>
+      )}
+    </div>
   );
 };
 
