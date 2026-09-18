@@ -1,7 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 
 // Customer pages
-import Home from "../pages/home/Home";
+import Home from "../pages/home/home";
 import Register from "../pages/auth/Register";
 import Login from "../pages/auth/Login";
 import Account from "../pages/account/Account";
@@ -26,7 +26,7 @@ const AppRoutes = () => {
     <Routes>
       {/* ==================== CUSTOMER ROUTES ==================== */}
 
-      <Route path="/" element={<home />} />
+      <Route path="/" element={<Home />} />
 
       <Route path="/shop" element={<Shop />} />
 
