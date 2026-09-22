@@ -2,6 +2,7 @@ import { useLocation } from "react-router-dom";
 
 import AppRoutes from "./routes/AppRoutes";
 import Navbar from "./components/layout/Navbar";
+import Footer from "./components/layout/Footer";
 import AdminRoutes from "./admin/routes/AdminRoutes";
 
 const App = () => {
@@ -13,9 +14,9 @@ const App = () => {
   return (
     <>
       {!isAdminRoute && <Navbar />}
-
       <AppRoutes />
       <AdminRoutes />
+      {!isAdminRoute && <Footer />}
     </>
   );
 };

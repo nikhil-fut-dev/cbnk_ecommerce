@@ -1,780 +1,1050 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import {
-  ArrowRight,
-  ChevronLeft,
-  ChevronRight,
-  Heart,
-  ShieldCheck,
-  Truck,
-  RotateCcw,
-  Headphones,
-  Sparkles,
-} from "lucide-react";
-
-import { getCategories } from "../../services/api/categoryApi";
-import { getProducts } from "../../services/api/productApi";
-import ProductCard from "../../components/product/ProductCard";
+import { useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Truck, Cake, Star } from "lucide-react";
 
 const Home = () => {
+  // =========================================================
+  // DUMMY BANNER DATA
+  // Backend baad mein banayenge
+  // =========================================================
+
+  const banners = [
+    {
+      id: 1,
+      image:
+        "https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=1800&q=90",
+      smallText: "YOUR WORLD",
+      title: "YOUR STYLE",
+    },
+    {
+      id: 2,
+      image:
+        "https://images.unsplash.com/photo-1485230895905-ec40ba36b9bc?auto=format&fit=crop&w=1800&q=90",
+      smallText: "NEW SEASON",
+      title: "NEW LOOK",
+    },
+    {
+      id: 3,
+      image:
+        "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=1800&q=90",
+      smallText: "CBNK COLLECTION",
+      title: "OWN YOUR STYLE",
+    },
+    {
+      id: 4,
+      image:
+        "https://images.unsplash.com/photo-1496217590455-aa63a8350eea?auto=format&fit=crop&w=1800&q=90",
+      smallText: "EVERYDAY EDIT",
+      title: "LOOK YOUR BEST",
+    },
+    {
+      id: 5,
+      image:
+        "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1800&q=90",
+      smallText: "CBNK",
+      title: "FIND YOUR FIT",
+    },
+  ];
+
   // =========================================================
   // STATE
   // =========================================================
 
-  const [categories, setCategories] = useState([]);
-  const [categoriesLoading, setCategoriesLoading] = useState(true);
-  const [categoriesError, setCategoriesError] = useState("");
-
-  const [featuredProducts, setFeaturedProducts] = useState([]);
-  const [featuredLoading, setFeaturedLoading] = useState(true);
-  const [featuredError, setFeaturedError] = useState("");
-
-  const [newArrivals, setNewArrivals] = useState([]);
-  const [newArrivalsLoading, setNewArrivalsLoading] = useState(true);
-  const [newArrivalsError, setNewArrivalsError] = useState("");
-
-  const [bestSellers, setBestSellers] = useState([]);
-  const [bestSellersLoading, setBestSellersLoading] = useState(true);
-  const [bestSellersError, setBestSellersError] = useState("");
-
-  const [categoryStart, setCategoryStart] = useState(0);
+  const [activeBanner, setActiveBanner] = useState(0);
 
   // =========================================================
-  // FETCH CATEGORIES
+  // CHARACTER MODE DUMMY DATA
+  // Backend baad mein connect karenge
   // =========================================================
 
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        setCategoriesLoading(true);
-        setCategoriesError("");
-
-        const response = await getCategories();
-
-        if (response.success) {
-          setCategories(response.data || []);
-        } else {
-          setCategoriesError(response.message || "Failed to load categories");
-        }
-      } catch (error) {
-        setCategoriesError(
-          error.response?.data?.message ||
-            "Unable to load categories. Please try again.",
-        );
-      } finally {
-        setCategoriesLoading(false);
-      }
-    };
-
-    fetchCategories();
-  }, []);
-
-  // =========================================================
-  // FETCH FEATURED PRODUCTS
-  // =========================================================
-
-  useEffect(() => {
-    const fetchFeaturedProducts = async () => {
-      try {
-        setFeaturedLoading(true);
-        setFeaturedError("");
-
-        const response = await getProducts({
-          featured: true,
-          limit: 8,
-        });
-
-        if (response.success) {
-          setFeaturedProducts(response.products || []);
-        } else {
-          setFeaturedError(
-            response.message || "Failed to load featured products",
-          );
-        }
-      } catch (error) {
-        setFeaturedError(
-          error.response?.data?.message || "Unable to load featured products.",
-        );
-      } finally {
-        setFeaturedLoading(false);
-      }
-    };
-
-    fetchFeaturedProducts();
-  }, []);
+  const characterModes = [
+    {
+      id: 1,
+      title: "Shop Men",
+      image:
+        "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=900&q=90",
+    },
+    {
+      id: 2,
+      title: "Shop Women",
+      image:
+        "https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=90",
+    },
+    {
+      id: 3,
+      title: "Shop Boys",
+      image:
+        "https://images.unsplash.com/photo-1503919545889-aef636e10ad4?auto=format&fit=crop&w=900&q=90",
+    },
+    {
+      id: 4,
+      title: "Shop Girls",
+      image:
+        "https://images.unsplash.com/photo-1596870230751-ebdfce98ec42?auto=format&fit=crop&w=900&q=90",
+    },
+    {
+      id: 5,
+      title: "Shop Add-Ons",
+      image:
+        "https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?auto=format&fit=crop&w=900&q=90",
+    },
+  ];
 
   // =========================================================
-  // FETCH NEW ARRIVALS
+  // CBNK ELITE DUMMY DATA
+  // Backend baad mein connect karenge
   // =========================================================
 
-  useEffect(() => {
-    const fetchNewArrivals = async () => {
-      try {
-        setNewArrivalsLoading(true);
-        setNewArrivalsError("");
-
-        const response = await getProducts({
-          newArrivals: true,
-          limit: 8,
-        });
-
-        if (response.success) {
-          setNewArrivals(response.products || []);
-        } else {
-          setNewArrivalsError(
-            response.message || "Failed to load new arrivals",
-          );
-        }
-      } catch (error) {
-        setNewArrivalsError(
-          error.response?.data?.message || "Unable to load new arrivals.",
-        );
-      } finally {
-        setNewArrivalsLoading(false);
-      }
-    };
-
-    fetchNewArrivals();
-  }, []);
+  const eliteBenefits = [
+    {
+      id: 1,
+      title: "Free Delivery",
+      description: "On all orders, for 365 days!",
+      icon: Truck,
+    },
+    {
+      id: 2,
+      title: "Birthday Vouchers",
+      description: "For you & your loved one!",
+      icon: Cake,
+    },
+    {
+      id: 3,
+      title: "Pre-sale Benefits",
+      description: "Exclusive early access & more",
+      icon: Star,
+    },
+  ];
 
   // =========================================================
-  // FETCH BEST SELLERS
+  // NEW IN - KIDS SETS DUMMY DATA
+  // Backend baad mein connect karenge
   // =========================================================
 
-  useEffect(() => {
-    const fetchBestSellers = async () => {
-      try {
-        setBestSellersLoading(true);
-        setBestSellersError("");
-
-        const response = await getProducts({
-          bestSeller: true,
-          limit: 8,
-        });
-
-        if (response.success) {
-          setBestSellers(response.products || []);
-        } else {
-          setBestSellersError(
-            response.message || "Failed to load best sellers",
-          );
-        }
-      } catch (error) {
-        setBestSellersError(
-          error.response?.data?.message || "Unable to load best sellers.",
-        );
-      } finally {
-        setBestSellersLoading(false);
-      }
-    };
-
-    fetchBestSellers();
-  }, []);
+  const kidsSets = [
+    {
+      id: 1,
+      title: "Boys (0-2 Yrs)",
+      image:
+        "https://images.unsplash.com/photo-1503919545889-aef636e10ad4?auto=format&fit=crop&w=700&q=90",
+    },
+    {
+      id: 2,
+      title: "Boys (2-8 Yrs)",
+      image:
+        "https://images.unsplash.com/photo-1519340241574-2cec6aef0c01?auto=format&fit=crop&w=700&q=90",
+    },
+    {
+      id: 3,
+      title: "Boys (8-16 Yrs)",
+      image:
+        "https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?auto=format&fit=crop&w=700&q=90",
+    },
+    {
+      id: 4,
+      title: "Girls (2-8 Yrs)",
+      image:
+        "https://images.unsplash.com/photo-1596870230751-ebdfce98ec42?auto=format&fit=crop&w=700&q=90",
+    },
+    {
+      id: 5,
+      title: "Girls (0-2 Yrs)",
+      image:
+        "https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?auto=format&fit=crop&w=700&q=90",
+    },
+  ];
 
   // =========================================================
-  // CATEGORY CAROUSEL
+  // SLEEPWEAR EDIT DUMMY DATA
+  // Backend baad mein connect karenge
   // =========================================================
 
-  const visibleCategories = categories.slice(categoryStart, categoryStart + 4);
+  const sleepwearEdit = {
+    desktopImage:
+      "https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=1800&q=90",
 
-  const canGoCategoryPrev = categoryStart > 0;
-  const canGoCategoryNext = categoryStart + 4 < categories.length;
+    mobileImage:
+      "https://images.unsplash.com/photo-1596755389378-c31d21fd1273?auto=format&fit=crop&w=900&q=90",
 
-  const nextCategories = () => {
-    if (canGoCategoryNext) {
-      setCategoryStart((prev) => prev + 1);
-    }
-  };
-
-  const previousCategories = () => {
-    if (canGoCategoryPrev) {
-      setCategoryStart((prev) => prev - 1);
-    }
+    smallText: "Comfort just got upgraded",
+    title: "600+ Sleepwear Styles",
+    price: "Starting at ₹399",
   };
 
   // =========================================================
-  // PRODUCT SECTION
+  // POLO SHOP DUMMY DATA
+  // Backend baad mein connect karenge
   // =========================================================
 
-  const ProductSection = ({
-    eyebrow,
-    title,
-    description,
-    products,
-    loading,
-    error,
-    emptyMessage,
-  }) => {
-    return (
-      <section className="bg-white py-20 sm:py-24">
-        <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-10">
-          {/* Header */}
-          <div className="mb-10 flex items-end justify-between gap-6">
-            <div>
-              <div className="mb-3 flex items-center gap-2">
-                <Sparkles
-                  size={15}
-                  strokeWidth={2}
-                  className="text-neutral-500"
-                />
+  const poloShop = {
+    desktopImage:
+      "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=1800&q=90",
 
-                <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-neutral-500">
-                  {eyebrow}
-                </p>
-              </div>
+    mobileImage:
+      "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=1800&q=90",
 
-              <h2 className="text-3xl font-semibold tracking-[-0.03em] text-neutral-950 sm:text-4xl">
-                {title}
-              </h2>
+    smallText: "The Polo Shop",
+    title: "POLOS FOR EVERY OCCASION",
+    price: "Starting at ₹399",
+  };
 
-              {description && (
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-neutral-500">
-                  {description}
-                </p>
-              )}
-            </div>
+  // =========================================================
+  // AUTO SLIDER
+  // =========================================================
 
-            <Link
-              to="/shop"
-              className="hidden shrink-0 items-center gap-2 text-sm font-semibold text-neutral-900 transition hover:gap-3 sm:flex"
-            >
-              View all
-              <ArrowRight size={17} />
-            </Link>
-          </div>
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveBanner((current) =>
+        current === banners.length - 1 ? 0 : current + 1,
+      );
+    }, 5000);
 
-          {/* Loading */}
-          {loading && (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 lg:grid-cols-4 lg:gap-x-6">
-              {[1, 2, 3, 4].map((item) => (
-                <div key={item} className="overflow-hidden">
-                  <div className="aspect-[4/5] animate-pulse bg-neutral-100" />
+    return () => clearInterval(interval);
+  }, [banners.length]);
 
-                  <div className="space-y-3 pt-4">
-                    <div className="h-3 w-1/3 animate-pulse bg-neutral-100" />
-                    <div className="h-4 w-4/5 animate-pulse bg-neutral-100" />
-                    <div className="h-4 w-1/4 animate-pulse bg-neutral-100" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+  // =========================================================
+  // PREVIOUS BANNER
+  // =========================================================
 
-          {/* Error */}
-          {!loading && error && (
-            <div className="border border-neutral-200 bg-neutral-50 px-6 py-8 text-center">
-              <p className="text-sm text-neutral-600">{error}</p>
-
-              <Link
-                to="/shop"
-                className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-neutral-950"
-              >
-                Continue shopping
-                <ArrowRight size={15} />
-              </Link>
-            </div>
-          )}
-
-          {/* Empty */}
-          {!loading && !error && products.length === 0 && (
-            <div className="border border-neutral-200 bg-neutral-50 px-6 py-12 text-center">
-              <p className="text-sm text-neutral-500">{emptyMessage}</p>
-            </div>
-          )}
-
-          {/* Products */}
-          {!loading && !error && products.length > 0 && (
-            <>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 lg:grid-cols-4 lg:gap-x-6">
-                {products.slice(0, 8).map((product) => (
-                  <ProductCard key={product._id} product={product} />
-                ))}
-              </div>
-
-              {/* Mobile View All */}
-              <div className="mt-10 text-center sm:hidden">
-                <Link
-                  to="/shop"
-                  className="inline-flex items-center gap-2 border-b border-neutral-900 pb-1 text-sm font-semibold text-neutral-950"
-                >
-                  View all products
-                  <ArrowRight size={16} />
-                </Link>
-              </div>
-            </>
-          )}
-        </div>
-      </section>
+  const previousBanner = () => {
+    setActiveBanner((current) =>
+      current === 0 ? banners.length - 1 : current - 1,
     );
   };
+
+  // =========================================================
+  // NEXT BANNER
+  // =========================================================
+
+  const nextBanner = () => {
+    setActiveBanner((current) =>
+      current === banners.length - 1 ? 0 : current + 1,
+    );
+  };
+
+  const currentBanner = banners[activeBanner];
 
   // =========================================================
   // RENDER
   // =========================================================
 
   return (
-    <main className="overflow-hidden bg-white">
+    <main className="w-full bg-white">
       {/* =====================================================
-          ANNOUNCEMENT BAR
+          PROMOTIONAL TICKER
       ====================================================== */}
 
-      <div className="bg-neutral-950 px-4 py-2.5 text-center text-[10px] font-semibold uppercase tracking-[0.2em] text-white sm:text-xs">
-        Discover the latest CBNK collection
-      </div>
+      <section className="relative overflow-hidden bg-[#56585a]">
+        {/* diagonal pattern */}
 
-      {/* =====================================================
-          HERO
-      ====================================================== */}
+        <div className="absolute inset-0 opacity-20">
+          <div
+            className="h-full w-full"
+            style={{
+              backgroundImage:
+                "repeating-linear-gradient(135deg, transparent 0px, transparent 9px, #ffffff 9px, #ffffff 18px)",
+            }}
+          />
+        </div>
 
-      <section className="relative bg-[#f3f1ed]">
-        <div className="mx-auto grid min-h-[620px] max-w-[1440px] lg:grid-cols-2">
-          {/* Hero Content */}
-          <div className="flex items-center px-5 py-16 sm:px-10 lg:px-16 xl:px-20">
-            <div className="max-w-xl">
-              <div className="mb-6 flex items-center gap-3">
-                <span className="h-px w-10 bg-neutral-900" />
-
-                <span className="text-[11px] font-bold uppercase tracking-[0.28em] text-neutral-700">
-                  CBNK New Season
-                </span>
-              </div>
-
-              <h1 className="text-5xl font-semibold leading-[0.95] tracking-[-0.055em] text-neutral-950 sm:text-6xl lg:text-7xl xl:text-[84px]">
-                Style that
-                <br />
-                feels like
-                <br />
-                <span className="italic font-normal">you.</span>
-              </h1>
-
-              <p className="mt-7 max-w-md text-sm leading-7 text-neutral-600 sm:text-base">
-                Discover carefully selected pieces made for everyday style,
-                comfort and confidence.
-              </p>
-
-              <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-                <Link
-                  to="/shop"
-                  className="group inline-flex items-center justify-center gap-3 bg-neutral-950 px-7 py-4 text-sm font-semibold text-white transition hover:bg-neutral-800"
-                >
-                  Shop Collection
-                  <ArrowRight
-                    size={17}
-                    className="transition-transform group-hover:translate-x-1"
-                  />
-                </Link>
-
-                <Link
-                  to="/shop?newArrivals=true"
-                  className="inline-flex items-center justify-center border border-neutral-300 bg-white px-7 py-4 text-sm font-semibold text-neutral-950 transition hover:border-neutral-950"
-                >
-                  New Arrivals
-                </Link>
-              </div>
-
-              {/* Small trust line */}
-              <div className="mt-10 flex flex-wrap gap-x-6 gap-y-3 text-[11px] font-medium text-neutral-500">
-                <span>Curated Collection</span>
-                <span>•</span>
-                <span>Quality First</span>
-                <span>•</span>
-                <span>Made for Everyday</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Hero Visual */}
-          <div className="relative min-h-[500px] overflow-hidden bg-neutral-200 lg:min-h-full">
-            {/* Editorial visual */}
-            <div className="absolute inset-0 bg-gradient-to-br from-neutral-300 via-neutral-200 to-neutral-100" />
-
-            {/* Decorative panels */}
-            <div className="absolute -right-24 top-16 h-80 w-80 rounded-full border-[60px] border-white/30" />
-
-            <div className="absolute bottom-[-80px] left-[-60px] h-72 w-72 rounded-full bg-white/30 blur-2xl" />
-
-            <div className="absolute inset-0 flex items-center justify-center p-10 sm:p-16">
-              <div className="relative h-full w-full max-w-[520px] overflow-hidden bg-neutral-100">
-                {/* Fashion-style composition */}
-                <div className="absolute inset-0 bg-gradient-to-b from-neutral-300 via-neutral-200 to-neutral-400" />
-
-                <div className="absolute left-1/2 top-[8%] h-[82%] w-[52%] -translate-x-1/2 rounded-t-[45%] bg-neutral-800/90" />
-
-                <div className="absolute left-1/2 top-[17%] h-[18%] w-[20%] -translate-x-1/2 rounded-full bg-neutral-300" />
-
-                <div className="absolute left-[22%] top-[37%] h-[45%] w-[20%] -rotate-[12deg] bg-neutral-700/90" />
-
-                <div className="absolute right-[22%] top-[37%] h-[45%] w-[20%] rotate-[12deg] bg-neutral-700/90" />
-
-                <div className="absolute bottom-[4%] left-1/2 h-[35%] w-[30%] -translate-x-1/2 bg-neutral-800" />
-
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-white/10" />
-
-                <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-white">
-                    CBNK / 01
-                  </span>
-
-                  <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-white/80">
-                    Collection
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Floating label */}
-            <div className="absolute bottom-8 left-5 hidden bg-white px-5 py-4 shadow-xl sm:block lg:left-8">
-              <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-neutral-400">
-                Featured
-              </p>
-
-              <p className="mt-1 text-sm font-semibold text-neutral-950">
-                The New Edit
-              </p>
-            </div>
+        <div className="relative mx-auto flex h-[38px] max-w-[1200px] items-center justify-center overflow-hidden px-4">
+          <div className="whitespace-nowrap text-center text-[11px] font-medium text-white sm:text-[13px]">
+            Flat 300 off on 1999. Code:{" "}
+            <span className="font-bold">CBNK300</span>
+            <span className="mx-3 text-white/60">|</span>
+            Flat 200 off on 1499. Code:{" "}
+            <span className="font-bold">CBNK200</span>
           </div>
         </div>
       </section>
 
       {/* =====================================================
-          CATEGORY SECTION
+          HERO BANNER
       ====================================================== */}
 
-      <section className="bg-white py-20 sm:py-24">
-        <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-10">
-          <div className="mb-10 flex items-end justify-between gap-5">
-            <div>
-              <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.28em] text-neutral-500">
-                Explore
-              </p>
+      <section className="w-full bg-white">
+        <div className="mx-auto max-w-[1200px] px-3 py-6 sm:px-5 sm:py-8 lg:px-0 lg:py-7">
+          <div className="relative aspect-[2.12/1] min-h-[300px] w-full overflow-hidden bg-neutral-200 sm:min-h-[380px] lg:min-h-[500px]">
+            {/* =================================================
+                BANNER IMAGE
+            ================================================= */}
 
-              <h2 className="text-3xl font-semibold tracking-[-0.035em] text-neutral-950 sm:text-4xl">
-                Shop by category
-              </h2>
+            {banners.map((banner, index) => (
+              <img
+                key={banner.id}
+                src={banner.image}
+                alt={banner.title}
+                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${
+                  index === activeBanner ? "opacity-100" : "opacity-0"
+                }`}
+              />
+            ))}
+
+            {/* =================================================
+                DARK OVERLAY
+            ================================================= */}
+
+            <div className="absolute inset-0 bg-black/20" />
+
+            {/* =================================================
+                LEFT ARROW
+            ================================================= */}
+
+            <button
+              type="button"
+              onClick={previousBanner}
+              aria-label="Previous banner"
+              className="absolute left-2 top-1/2 z-10 flex h-8 w-5 -translate-y-1/2 items-center justify-center bg-[#e5bd86] text-neutral-950 transition hover:bg-[#d9a968] sm:left-3 sm:h-8 sm:w-5"
+            >
+              <ChevronLeft size={22} strokeWidth={1.8} />
+            </button>
+
+            {/* =================================================
+                RIGHT ARROW
+            ================================================= */}
+
+            <button
+              type="button"
+              onClick={nextBanner}
+              aria-label="Next banner"
+              className="absolute right-2 top-1/2 z-10 flex h-8 w-5 -translate-y-1/2 items-center justify-center bg-[#e5bd86] text-neutral-950 transition hover:bg-[#d9a968] sm:right-3 sm:h-8 sm:w-5"
+            >
+              <ChevronRight size={22} strokeWidth={1.8} />
+            </button>
+
+            {/* =================================================
+                BANNER TEXT
+            ================================================= */}
+
+            <div className="absolute left-[9%] top-1/2 z-10 -translate-y-1/2 text-white sm:left-[5%]">
+              <div className="inline-block bg-white px-3 py-1.5 sm:px-4 sm:py-2">
+                <p className="text-[10px] font-bold tracking-[0.04em] text-[#1c3b52] sm:text-[14px]">
+                  {currentBanner.smallText}
+                </p>
+              </div>
+
+              <h1 className="mt-2 text-[30px] font-bold uppercase leading-none tracking-[0.01em] text-white drop-shadow-md sm:text-5xl lg:text-[56px]">
+                {currentBanner.title}
+              </h1>
             </div>
 
-            {categories.length > 4 && (
-              <div className="hidden gap-2 sm:flex">
+            {/* =================================================
+                SLIDER DOTS
+            ================================================= */}
+
+            <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 sm:bottom-4">
+              {banners.map((banner, index) => (
                 <button
+                  key={banner.id}
                   type="button"
-                  onClick={previousCategories}
-                  disabled={!canGoCategoryPrev}
-                  className="flex h-10 w-10 items-center justify-center border border-neutral-200 text-neutral-900 transition hover:border-neutral-900 disabled:cursor-not-allowed disabled:opacity-30"
-                  aria-label="Previous categories"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={nextCategories}
-                  disabled={!canGoCategoryNext}
-                  className="flex h-10 w-10 items-center justify-center border border-neutral-200 text-neutral-900 transition hover:border-neutral-900 disabled:cursor-not-allowed disabled:opacity-30"
-                  aria-label="Next categories"
-                >
-                  <ChevronRight size={18} />
-                </button>
-              </div>
-            )}
-
-            <Link
-              to="/shop"
-              className="flex items-center gap-2 text-sm font-semibold text-neutral-900 sm:hidden"
-            >
-              View all
-              <ArrowRight size={16} />
-            </Link>
-          </div>
-
-          {/* Loading */}
-          {categoriesLoading && (
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-5">
-              {[1, 2, 3, 4].map((item) => (
-                <div
-                  key={item}
-                  className="aspect-[3/4] animate-pulse bg-neutral-100"
+                  onClick={() => setActiveBanner(index)}
+                  aria-label={`Go to banner ${index + 1}`}
+                  className={`h-[5px] transition-all duration-300 ${
+                    index === activeBanner
+                      ? "w-[20px] bg-[#d8b28a]"
+                      : "w-[8px] bg-white/60"
+                  }`}
                 />
               ))}
             </div>
-          )}
+          </div>
+        </div>
+      </section>
 
-          {/* Error */}
-          {!categoriesLoading && categoriesError && (
-            <div className="border border-neutral-200 bg-neutral-50 p-8 text-center">
-              <p className="text-sm text-neutral-600">{categoriesError}</p>
-            </div>
-          )}
+      {/* =====================================================
+          CHARACTER MODE
+      ====================================================== */}
 
-          {/* Empty */}
-          {!categoriesLoading &&
-            !categoriesError &&
-            categories.length === 0 && (
-              <div className="border border-neutral-200 bg-neutral-50 p-8 text-center">
-                <p className="text-sm text-neutral-500">
-                  No categories available right now.
-                </p>
+      <section className="w-full bg-white [&::-webkit-scrollbar]:hidden">
+        <div className="mx-auto max-w-[1200px] px-3 py-5 sm:px-5 sm:py-7 lg:px-0">
+          {/* =================================================
+              SECTION TITLE
+          ================================================== */}
+
+          <div className="mb-2">
+            <h2 className="inline-block text-[20px] font-bold leading-none text-black sm:text-[24px]">
+              Character Mode: On
+            </h2>
+
+            <div className="mt-1 h-[4px] w-[50px] bg-[#d8b28a]" />
+          </div>
+
+          {/* =================================================
+              CHARACTER CARDS
+          ================================================== */}
+
+          <div
+            className="
+              flex
+              gap-3
+              overflow-x-auto
+              pb-3
+              scroll-smooth
+              scrollbar-hide
+              snap-x
+              snap-mandatory
+              sm:gap-4
+              lg:overflow-x-hidden
+              [&::-webkit-scrollbar]:hidden
+            "
+          >
+            {characterModes.map((character) => (
+              <div
+                key={character.id}
+                className="
+                  group
+                  relative
+                  h-[300px]
+                  w-[210px]
+                  shrink-0
+                  cursor-pointer
+                  overflow-hidden
+                  bg-neutral-200
+                  snap-start
+                  sm:h-[320px]
+                  sm:w-[230px]
+                  lg:h-[320px]
+                  lg:flex-1
+                  lg:w-auto
+                "
+              >
+                {/* =================================================
+                    IMAGE
+                ================================================== */}
+
+                <img
+                  src={character.image}
+                  alt={character.title}
+                  className="
+                    h-full
+                    w-full
+                    object-cover
+                    transition-transform
+                    duration-700
+                    group-hover:scale-105
+                  "
+                />
+
+                {/* =================================================
+                    DARK OVERLAY
+                ================================================== */}
+
+                <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
+
+                {/* =================================================
+                    TITLE
+                ================================================== */}
+
+                <div className="absolute bottom-4 left-4 z-10">
+                  <h3 className="text-[15px] font-bold text-white drop-shadow-md sm:text-[16px]">
+                    {character.title}
+                  </h3>
+                </div>
               </div>
-            )}
-
-          {/* Categories */}
-          {!categoriesLoading && !categoriesError && categories.length > 0 && (
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-5">
-              {visibleCategories.map((category, index) => (
-                <Link
-                  key={category._id}
-                  to={`/shop?category=${category.slug}`}
-                  className="group relative aspect-[3/4] overflow-hidden bg-neutral-100"
-                >
-                  {/* Image */}
-                  {category.image ? (
-                    <img
-                      src={category.image}
-                      alt={category.name}
-                      loading={index > 1 ? "lazy" : "eager"}
-                      className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="absolute inset-0 bg-gradient-to-br from-neutral-200 to-neutral-400" />
-                  )}
-
-                  {/* Overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent opacity-90" />
-
-                  {/* Content */}
-                  <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-7">
-                    <p className="mb-2 text-[9px] font-semibold uppercase tracking-[0.25em] text-white/70">
-                      CBNK Collection
-                    </p>
-
-                    <h3 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">
-                      {category.name}
-                    </h3>
-
-                    <div className="mt-3 flex items-center gap-2 text-xs font-semibold text-white">
-                      Shop now
-                      <ArrowRight
-                        size={14}
-                        className="transition-transform group-hover:translate-x-1"
-                      />
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* =====================================================
-          FEATURED
-      ====================================================== */}
-
-      <div className="bg-[#f7f7f5]">
-        <ProductSection
-          eyebrow="Handpicked for you"
-          title="Featured products"
-          description="A selection of products from the CBNK collection."
-          products={featuredProducts}
-          loading={featuredLoading}
-          error={featuredError}
-          emptyMessage="No featured products available right now."
-        />
-      </div>
-
-      {/* =====================================================
-          EDITORIAL BANNER
-      ====================================================== */}
-
-      <section className="bg-[#f7f7f5] pb-20 sm:pb-24">
-        <div className="mx-auto max-w-[1440px] px-4 sm:px-6 lg:px-10">
-          <div className="relative min-h-[430px] overflow-hidden bg-neutral-900">
-            <div className="absolute inset-0 bg-gradient-to-r from-black via-neutral-900/80 to-transparent" />
-
-            <div className="absolute right-[-10%] top-[-30%] h-[600px] w-[600px] rounded-full border-[100px] border-white/5" />
-
-            <div className="relative z-10 flex min-h-[430px] max-w-xl items-center px-7 py-14 sm:px-12 lg:px-16">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-neutral-400">
-                  CBNK / The Edit
-                </p>
-
-                <h2 className="mt-5 text-4xl font-semibold leading-tight tracking-[-0.04em] text-white sm:text-5xl">
-                  Less noise.
-                  <br />
-                  More style.
-                </h2>
-
-                <p className="mt-5 max-w-md text-sm leading-7 text-neutral-400">
-                  Explore a collection designed around pieces you can actually
-                  wear, combine and make your own.
-                </p>
-
-                <Link
-                  to="/shop"
-                  className="group mt-8 inline-flex items-center gap-3 bg-white px-7 py-4 text-sm font-semibold text-neutral-950 transition hover:bg-neutral-200"
-                >
-                  Explore collection
-                  <ArrowRight
-                    size={17}
-                    className="transition-transform group-hover:translate-x-1"
-                  />
-                </Link>
-              </div>
-            </div>
-
-            <div className="absolute bottom-7 right-7 hidden text-right lg:block">
-              <p className="text-5xl font-light tracking-[-0.05em] text-white/10">
-                CBNK
-              </p>
-            </div>
+            ))}
           </div>
         </div>
       </section>
-
       {/* =====================================================
-          NEW ARRIVALS
+          CBNK ELITE MEMBERSHIP
       ====================================================== */}
 
-      <ProductSection
-        eyebrow="Just dropped"
-        title="New arrivals"
-        description="Fresh additions to the collection, selected for the new season."
-        products={newArrivals}
-        loading={newArrivalsLoading}
-        error={newArrivalsError}
-        emptyMessage="No new arrivals available right now."
-      />
+      <section className="w-full bg-white">
+        <div
+          className="
+            relative
+            mx-auto
+            max-w-[1200px]
+            overflow-hidden
+            bg-[#111111]
+            px-4
+            py-10
+            sm:px-7
+            sm:py-12
+            lg:px-12
+            lg:py-14
+          "
+        >
+          {/* =================================================
+              DIAGONAL BACKGROUND
+          ================================================== */}
 
-      {/* =====================================================
-          BEST SELLERS
-      ====================================================== */}
-
-      <div className="bg-[#f7f7f5]">
-        <ProductSection
-          eyebrow="Customer favourites"
-          title="Best sellers"
-          description="Discover products that are already getting attention."
-          products={bestSellers}
-          loading={bestSellersLoading}
-          error={bestSellersError}
-          emptyMessage="No best sellers available right now."
-        />
-      </div>
-
-      {/* =====================================================
-          SERVICE / TRUST STRIP
-      ====================================================== */}
-
-      <section className="border-y border-neutral-200 bg-white">
-        <div className="mx-auto grid max-w-[1440px] grid-cols-2 divide-x divide-y divide-neutral-200 sm:grid-cols-4 sm:divide-y-0">
-          <div className="flex items-center gap-4 px-5 py-7 sm:px-7 lg:px-10">
-            <Truck
-              size={23}
-              strokeWidth={1.5}
-              className="shrink-0 text-neutral-700"
-            />
-
-            <div>
-              <p className="text-xs font-bold text-neutral-950">
-                Easy Shopping
-              </p>
-
-              <p className="mt-1 text-[11px] text-neutral-500">
-                Simple and seamless
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 px-5 py-7 sm:px-7 lg:px-10">
-            <ShieldCheck
-              size={23}
-              strokeWidth={1.5}
-              className="shrink-0 text-neutral-700"
-            />
-
-            <div>
-              <p className="text-xs font-bold text-neutral-950">
-                Secure Checkout
-              </p>
-
-              <p className="mt-1 text-[11px] text-neutral-500">
-                Protected payments
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 px-5 py-7 sm:px-7 lg:px-10">
-            <RotateCcw
-              size={23}
-              strokeWidth={1.5}
-              className="shrink-0 text-neutral-700"
-            />
-
-            <div>
-              <p className="text-xs font-bold text-neutral-950">Easy Returns</p>
-
-              <p className="mt-1 text-[11px] text-neutral-500">
-                Hassle-free experience
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 px-5 py-7 sm:px-7 lg:px-10">
-            <Headphones
-              size={23}
-              strokeWidth={1.5}
-              className="shrink-0 text-neutral-700"
-            />
-
-            <div>
-              <p className="text-xs font-bold text-neutral-950">
-                Customer Support
-              </p>
-
-              <p className="mt-1 text-[11px] text-neutral-500">
-                We're here to help
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* =====================================================
-          FINAL CTA
-      ====================================================== */}
-
-      <section className="bg-white px-4 py-20 sm:px-6 sm:py-28">
-        <div className="mx-auto max-w-[1000px] text-center">
-          <Heart
-            size={24}
-            strokeWidth={1.4}
-            className="mx-auto text-neutral-400"
+          <div
+            className="pointer-events-none absolute inset-0 opacity-40"
+            style={{
+              backgroundImage:
+                "repeating-linear-gradient(135deg, transparent 0px, transparent 10px, rgba(255,255,255,0.025) 10px, rgba(255,255,255,0.025) 20px)",
+            }}
           />
 
-          <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.3em] text-neutral-400">
-            Your next favourite piece
-          </p>
+          {/* =================================================
+              MAIN CONTENT
+          ================================================== */}
 
-          <h2 className="mx-auto mt-4 max-w-3xl text-4xl font-semibold leading-tight tracking-[-0.045em] text-neutral-950 sm:text-5xl lg:text-6xl">
-            Find something that feels
-            <span className="italic font-normal"> right.</span>
-          </h2>
+          <div className="relative z-10 grid grid-cols-1 gap-8 lg:grid-cols-[1fr_230px] lg:items-center lg:gap-14">
+            {/* =================================================
+                LEFT CONTENT
+            ================================================== */}
 
-          <p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-neutral-500">
-            Browse the complete CBNK collection and discover pieces made for
-            your everyday style.
-          </p>
+            <div className="min-w-0">
+              {/* Heading */}
 
-          <Link
-            to="/shop"
-            className="group mt-8 inline-flex items-center gap-3 bg-neutral-950 px-8 py-4 text-sm font-semibold text-white transition hover:bg-neutral-800"
+              <div className="mb-7 sm:mb-8">
+                <h2
+                  className="
+                    text-[24px]
+                    font-bold
+                    leading-tight
+                    text-white
+                    sm:text-[30px]
+                    lg:text-[32px]
+                  "
+                >
+                  Unlock Savings Worth ₹1000+
+                </h2>
+
+                <div className="mt-2 h-[4px] w-[55px] bg-[#d8b28a]" />
+              </div>
+
+              {/* =================================================
+                  BENEFITS
+              ================================================== */}
+
+              <div
+                className="
+                  flex
+                  gap-3
+                  overflow-x-auto
+                  pb-3
+                  scroll-smooth
+                  snap-x
+                  snap-mandatory
+                  scrollbar-hide
+                  sm:gap-4
+                  lg:grid
+                  lg:grid-cols-1
+                  lg:overflow-visible
+                  lg:pb-0
+                  [&::-webkit-scrollbar]:hidden
+                "
+              >
+                {eliteBenefits.map((benefit) => {
+                  const Icon = benefit.icon;
+
+                  return (
+                    <div
+                      key={benefit.id}
+                      className="
+                        flex
+                        h-[78px]
+                        w-[270px]
+                        shrink-0
+                        snap-start
+                        items-center
+                        gap-4
+                        bg-[#d8b28a]
+                        px-4
+                        transition
+                        duration-300
+                        hover:bg-[#e1bd98]
+                        sm:w-[39px]
+                        lg:h-[78px]
+                        lg:w-[350px]
+                      "
+                    >
+                      {/* Icon */}
+
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center text-black">
+                        <Icon size={25} strokeWidth={1.8} />
+                      </div>
+
+                      {/* Text */}
+
+                      <div className="min-w-0">
+                        <h3
+                          className="
+                            text-[14px]
+                            font-bold
+                            leading-tight
+                            text-black
+                            sm:text-[15px]
+                          "
+                        >
+                          {benefit.title}
+                        </h3>
+
+                        <p
+                          className="
+                            mt-0.5
+                            whitespace-nowrap
+                            text-[10px]
+                            font-medium
+                            text-black
+                            sm:text-[11px]
+                          "
+                        >
+                          {benefit.description}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* =================================================
+                ELITE MEMBERSHIP CARD
+            ================================================== */}
+
+            <div className="mx-auto w-full max-w-[220px] bg-black text-white">
+              {/* Card Top */}
+
+              <div className="px-4 pb-5 pt-5">
+                {/* Logo */}
+
+                <div className="mx-auto flex h-[60px] w-[145px] items-center justify-center overflow-hidden bg-[#969696]">
+                  <img
+                    src="/logo.png"
+                    alt="CBNK"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+
+                {/* Elite */}
+
+                <h3
+                  className="
+                    mt-3
+                    text-center
+                    text-[27px]
+                    font-bold
+                    lowercase
+                    leading-none
+                    tracking-wide
+                  "
+                >
+                  elite
+                </h3>
+
+                <p className="mt-2 text-center text-[8px] font-medium uppercase tracking-wide text-white">
+                  NEW LOOK. NEW REWARDS.
+                </p>
+
+                {/* Price */}
+
+                <div className="mt-5 text-center">
+                  <p className="text-[12px] text-white/70 line-through">₹499</p>
+
+                  <p className="mt-1 text-[27px] font-bold leading-none">
+                    ₹249
+                  </p>
+
+                  <p className="mt-2 text-[10px] text-white">
+                    Inclusive of all taxes
+                  </p>
+                </div>
+              </div>
+
+              {/* Validity */}
+
+              <div className="mx-5 mb-5 bg-[#292929] py-2 text-center">
+                <span className="text-[9px] font-semibold text-white">
+                  Valid for 12 Months
+                </span>
+              </div>
+
+              {/* CTA */}
+
+              <button
+                type="button"
+                className="
+                  mx-5
+                  mb-5
+                  block
+                  w-[calc(100%-40px)]
+                  bg-[#d8b28a]
+                  py-2.5
+                  text-[10px]
+                  font-bold
+                  uppercase
+                  tracking-wide
+                  text-black
+                  transition
+                  hover:bg-[#e1bd98]
+                "
+              >
+                Join Elite
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+      {/* =====================================================
+          NEW IN - KIDS SETS
+      ====================================================== */}
+
+      <section className="w-full bg-white [&::-webkit-scrollbar]:hidden">
+        <div className="mx-auto max-w-[1200px] px-3 py-5 sm:px-5 sm:py-7 lg:px-0">
+          {/* =================================================
+              SECTION TITLE
+          ================================================== */}
+
+          <div className="mb-2">
+            <h2 className="inline-block text-[20px] font-bold leading-none text-black sm:text-[24px]">
+              New In - Kids Sets
+            </h2>
+
+            <div className="mt-1 h-[4px] w-[50px] bg-[#d8b28a]" />
+          </div>
+
+          {/* =================================================
+              KidsSets CARDS
+          ================================================== */}
+
+          <div
+            className="
+              flex
+              gap-3
+              overflow-x-auto
+              pb-3
+              scroll-smooth
+              scrollbar-hide
+              snap-x
+              snap-mandatory
+              sm:gap-4
+              lg:overflow-x-hidden
+              [&::-webkit-scrollbar]:hidden
+            "
           >
-            Shop all products
-            <ArrowRight
-              size={17}
-              className="transition-transform group-hover:translate-x-1"
+            {kidsSets.map((item) => (
+              <div
+                key={item.id}
+                className="
+                  group
+                  relative
+                  h-[300px]
+                  w-[210px]
+                  shrink-0
+                  cursor-pointer
+                  overflow-hidden
+                  bg-neutral-200
+                  snap-start
+                  sm:h-[320px]
+                  sm:w-[230px]
+                  lg:h-[320px]
+                  lg:flex-1
+                  lg:w-auto
+                "
+              >
+                {/* =================================================
+                    IMAGE
+                ================================================== */}
+
+                <img
+                  src={item.image}
+                  alt={item.title}
+                  className="
+                    h-full
+                    w-full
+                    object-cover
+                    transition-transform
+                    duration-700
+                    group-hover:scale-105
+                  "
+                />
+
+                {/* =================================================
+                    DARK OVERLAY
+                ================================================== */}
+
+                <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
+
+                {/* =================================================
+                    TITLE
+                ================================================== */}
+
+                <div className="absolute bottom-4 left-4 z-10">
+                  <h3 className="text-[15px] font-bold text-white drop-shadow-md sm:text-[16px]">
+                    {item.title}
+                  </h3>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+      {/* =====================================================
+          SLEEPWEAR EDIT
+      ====================================================== */}
+
+      <section className="w-full bg-white">
+        <div className="mx-auto max-w-[1200px] px-3 py-5 sm:px-5 sm:py-7 lg:px-0">
+          {/* =================================================
+              SECTION TITLE
+          ================================================== */}
+
+          <div className="mb-2">
+            <h2 className="inline-block text-[20px] font-bold leading-none text-black sm:text-[24px]">
+              Sleepwear Edit
+            </h2>
+
+            <div className="mt-1 h-[4px] w-[50px] bg-[#d8b28a]" />
+          </div>
+
+          {/* =================================================
+              RESPONSIVE BANNER
+          ================================================== */}
+
+          <div className="relative w-full overflow-hidden bg-neutral-200">
+            {/* =================================================
+                DESKTOP / MOBILE IMAGE
+            ================================================== */}
+
+            <picture>
+              {/* Mobile Image */}
+              <source
+                media="(max-width: 767px)"
+                srcSet={sleepwearEdit.mobileImage}
+              />
+
+              {/* Desktop / Tablet Image */}
+              <img
+                src={sleepwearEdit.desktopImage}
+                alt="Sleepwear Edit"
+                className="
+                  h-[260px]
+                  w-full
+                  object-cover
+                  object-center
+                  sm:h-[320px]
+                  md:h-[380px]
+                  lg:h-[500px]
+                "
+              />
+            </picture>
+
+            {/* =================================================
+                DARK OVERLAY
+            ================================================== */}
+
+            <div className="absolute inset-0 bg-black/30" />
+
+            {/* =================================================
+                BANNER CONTENT
+            ================================================== */}
+
+            <div
+              className="
+                absolute
+                left-[6%]
+                top-1/2
+                z-10
+                -translate-y-1/2
+                text-white
+                sm:left-[7%]
+                md:left-[6%]
+              "
+            >
+              {/* Small Text */}
+
+              <p
+                className="
+                  text-[13px]
+                  font-semibold
+                  leading-tight
+                  text-white
+                  drop-shadow-md
+                  sm:text-[17px]
+                  md:text-[21px]
+                  lg:text-[26px]
+                "
+              >
+                {sleepwearEdit.smallText}
+              </p>
+
+              {/* Main Title */}
+
+              <h2
+                className="
+                  mt-2
+                  text-[23px]
+                  font-bold
+                  leading-tight
+                  text-white
+                  drop-shadow-md
+                  sm:mt-3
+                  sm:text-[30px]
+                  md:text-[38px]
+                  lg:text-[44px]
+                "
+              >
+                {sleepwearEdit.title}
+              </h2>
+
+              {/* Price */}
+
+              <p
+                className="
+                  mt-2
+                  text-[13px]
+                  font-semibold
+                  text-white
+                  drop-shadow-md
+                  sm:mt-3
+                  sm:text-[17px]
+                  md:text-[21px]
+                  lg:text-[25px]
+                "
+              >
+                {sleepwearEdit.price}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+      {/* =====================================================
+    THE POLO SHOP
+====================================================== */}
+
+      <section className="w-full bg-white">
+        <div className="mx-auto max-w-[1200px] px-3 py-5 sm:px-5 sm:py-7 lg:px-0">
+          {/* =================================================
+        SECTION TITLE
+    ================================================== */}
+
+          <div className="mb-2">
+            <h2 className="inline-block text-[18px] font-bold leading-none text-black sm:text-[21px] lg:text-[24px]">
+              {poloShop.smallText}
+            </h2>
+
+            <div className="mt-1 h-[4px] w-[50px] bg-[#d8b28a] sm:w-[55px]" />
+          </div>
+
+          {/* =================================================
+        RESPONSIVE POLO BANNER
+    ================================================== */}
+
+          <div className="relative w-full overflow-hidden bg-neutral-200">
+            {/* =================================================
+          DESKTOP / MOBILE IMAGE
+      ================================================= */}
+
+            <picture>
+              {/* Mobile Image */}
+              <source
+                media="(max-width: 767px)"
+                srcSet={poloShop.mobileImage}
+              />
+
+              {/* Desktop / Tablet Image */}
+              <img
+                src={poloShop.desktopImage}
+                alt="The Polo Shop"
+                className="
+            h-[190px]
+            w-full
+            object-cover
+            object-center
+
+            sm:h-[240px]
+            md:h-[300px]
+            lg:h-[390px]
+            xl:h-[430px]
+          "
+              />
+            </picture>
+
+            {/* =================================================
+          LEFT DARK SHADOW
+      ================================================== */}
+
+            <div
+              className="
+          absolute
+          inset-y-0
+          left-0
+          w-[40%]
+          bg-gradient-to-r
+          from-black/60
+          via-black/25
+          to-transparent
+        "
             />
-          </Link>
+
+            {/* =================================================
+          BANNER CONTENT
+      ================================================== */}
+
+            <div
+              className="
+          absolute
+          left-[5%]
+          top-1/2
+          z-10
+          -translate-y-1/2
+          text-white
+
+          sm:left-[5%]
+          md:left-[5%]
+          lg:left-[4%]
+        "
+            >
+              {/* =================================================
+            MAIN TITLE
+        ================================================== */}
+
+              <h2
+                className="
+            max-w-[190px]
+            text-[20px]
+            font-bold
+            uppercase
+            leading-[1.05]
+            tracking-tight
+            text-white
+            drop-shadow-lg
+
+            sm:max-w-[280px]
+            sm:text-[27px]
+
+            md:max-w-[370px]
+            md:text-[36px]
+
+            lg:max-w-[500px]
+            lg:text-[46px]
+
+            xl:text-[52px]
+          "
+              >
+                {poloShop.title}
+              </h2>
+
+              {/* =================================================
+            PRICE
+        ================================================== */}
+
+              <p
+                className="
+            mt-2
+            text-[12px]
+            font-semibold
+            text-white
+            drop-shadow-md
+
+            sm:mt-3
+            sm:text-[14px]
+
+            md:text-[17px]
+
+            lg:mt-4
+            lg:text-[20px]
+
+            xl:text-[22px]
+          "
+              >
+                {poloShop.price}
+              </p>
+            </div>
+          </div>
         </div>
       </section>
     </main>
