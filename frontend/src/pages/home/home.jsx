@@ -601,7 +601,7 @@ const Home = () => {
               <div className="px-4 pb-5 pt-5">
                 {/* Logo */}
 
-                <div className="mx-auto flex h-[60px] w-[145px] items-center justify-center overflow-hidden bg-[#969696]">
+                <div className="mx-auto flex h-[60px] w-[145px] items-center justify-center overflow-hidden bg-[#F8F9F9]">
                   <img
                     src="/logo.png"
                     alt="CBNK"

@@ -22,6 +22,22 @@ import adminProductRoutes from "./routes/adminProductRoutes.js";
 import adminCouponRoutes from "./routes/adminCouponRoutes.js";
 import adminDashboardRoutes from "./routes/adminDashboardRoutes.js";
 import adminUserRoutes from "./routes/adminUserRoutes.js";
+import homeRoutes from "./routes/homeRoutes.js";
+import adminHomeRoutes from "./routes/adminHomeRoutes.js";
+import promotionalTickerRoutes from "./routes/promotionalTickerRoutes.js";
+import adminPromotionalTickerRoutes from "./routes/adminPromotionalTickerRoutes.js";
+import heroBannerRoutes from "./routes/heroBannerRoutes.js";
+import adminHeroBannerRoutes from "./routes/adminHeroBannerRoutes.js";
+import characterModeRoutes from "./routes/characterModeRoutes.js";
+import adminCharacterModeRoutes from "./routes/adminCharacterModeRoutes.js";
+import cBNKEliteRoutes from "./routes/cBNKEliteRoutes.js";
+import adminCBNKEliteRoutes from "./routes/adminCBNKEliteRoutes.js";
+import kidsSetRoutes from "./routes/kidsSetRoutes.js";
+import adminKidsSetRoutes from "./routes/adminKidsSetRoutes.js";
+import sleepwearEditRoutes from "./routes/sleepwearEditRoutes.js";
+import adminSleepwearEditRoutes from "./routes/adminSleepwearEditRoutes.js";
+import poloShopRoutes from "./routes/poloShopRoutes.js";
+import adminPoloShopRoutes from "./routes/adminPoloShopRoutes.js";
 
 const app = express();
 
@@ -89,6 +105,22 @@ app.use("/api/v1/admin/products", adminProductRoutes);
 app.use("/api/v1/admin/coupons", adminCouponRoutes);
 app.use("/api/v1/admin/dashboard", adminDashboardRoutes);
 app.use("/api/v1/admin/users", adminUserRoutes);
+app.use("/api/v1/home", homeRoutes);
+app.use("/api/v1/admin/home", adminHomeRoutes);
+app.use("/api/v1/home/promotional-ticker", promotionalTickerRoutes);
+app.use("/api/v1/admin/home/promotional-ticker", adminPromotionalTickerRoutes);
+app.use("/api/v1/home/hero-banners", heroBannerRoutes);
+app.use("/api/v1/admin/home/hero-banners", adminHeroBannerRoutes);
+app.use("/api/v1/home/character-modes", characterModeRoutes);
+app.use("/api/v1/admin/home/character-modes", adminCharacterModeRoutes);
+app.use("/api/v1/home/elite", cBNKEliteRoutes);
+app.use("/api/v1/admin/home/elite", adminCBNKEliteRoutes);
+app.use("/api/v1/home/kids-sets", kidsSetRoutes);
+app.use("/api/v1/admin/home/kids-sets", adminKidsSetRoutes);
+app.use("/api/v1/home/sleepwear", sleepwearEditRoutes);
+app.use("/api/v1/admin/home/sleepwear", adminSleepwearEditRoutes);
+app.use("/api/v1/home/polo-shop", poloShopRoutes);
+app.use("/api/v1/admin/home/polo-shop", adminPoloShopRoutes);
 
 // Health
 app.get("/api/v1/health", (req, res) => {

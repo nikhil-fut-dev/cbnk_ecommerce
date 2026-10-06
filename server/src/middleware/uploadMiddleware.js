@@ -22,3 +22,15 @@ export const uploadProductImages = upload.array("images", 10);
 
 // Category ke liye single image
 export const uploadCategoryImage = upload.single("image");
+
+// Hero Banner ke liye desktop + mobile images
+export const uploadHeroBannerImages = upload.fields([
+  {
+    name: "desktopImage",
+    maxCount: 1,
+  },
+  {
+    name: "mobileImage",
+    maxCount: 1,
+  },
+]);
