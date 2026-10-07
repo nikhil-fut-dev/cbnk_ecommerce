@@ -13,6 +13,12 @@ import AdminCharacterModes from "../pages/home/AdminCharacterModes";
 import AdminCharacterModeForm from "../pages/home/AdminCharacterModeForm";
 import AdminElite from "../pages/home/AdminElite";
 import AdminEliteForm from "../pages/home/AdminEliteForm";
+import AdminKidsSets from "../pages/home/AdminKidsSets";
+import AdminKidsSetForm from "../pages/home/AdminKidsSetForm";
+import AdminSleepwearEdits from "../pages/home/AdminSleepwearEdits";
+import AdminSleepwearEditForm from "../pages/home/AdminSleepwearEditForm";
+import AdminPoloShops from "../pages/home/AdminPoloShops";
+import AdminPoloShopForm from "../pages/home/AdminPoloShopForm";
 
 // Dashboard
 import AdminDashboard from "../pages/dashboard/AdminDashboard";
@@ -102,6 +108,36 @@ const AdminRoutes = () => {
           <Route path="home/elite/new" element={<AdminEliteForm />} />
 
           <Route path="home/elite/:id/edit" element={<AdminEliteForm />} />
+
+          <Route path="home/kids-sets" element={<AdminKidsSets />} />
+
+          <Route path="home/kids-sets/new" element={<AdminKidsSetForm />} />
+
+          <Route
+            path="home/kids-sets/:id/edit"
+            element={<AdminKidsSetForm />}
+          />
+
+          <Route path="home/sleepwear" element={<AdminSleepwearEdits />} />
+
+          <Route
+            path="home/sleepwear/new"
+            element={<AdminSleepwearEditForm />}
+          />
+
+          <Route
+            path="home/sleepwear/:id/edit"
+            element={<AdminSleepwearEditForm />}
+          />
+
+          <Route path="home/polo-shop" element={<AdminPoloShops />} />
+
+          <Route path="home/polo-shop/new" element={<AdminPoloShopForm />} />
+
+          <Route
+            path="home/polo-shop/:id/edit"
+            element={<AdminPoloShopForm />}
+          />
 
           {/* ==================== PRODUCTS ==================== */}
 

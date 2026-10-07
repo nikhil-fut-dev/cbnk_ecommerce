@@ -52,7 +52,6 @@ const validateCategory = async (categoryId) => {
 
   return Category.findOne({
     _id: categoryId,
-    isDeleted: false,
     isActive: true,
   }).lean();
 };
@@ -79,9 +78,7 @@ export const getPoloShops = async (req, res) => {
     const poloShops = await getPublishedPoloShops();
 
     const safePoloShops = poloShops.filter((poloShop) => {
-      const categoryValid =
-        !poloShop.category ||
-        (poloShop.category.isActive && !poloShop.category.isDeleted);
+      const categoryValid = !poloShop.category || poloShop.category.isActive;
 
       const productValid =
         !poloShop.product ||

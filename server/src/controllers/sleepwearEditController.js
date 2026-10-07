@@ -31,7 +31,6 @@ const validateCategory = async (categoryId) => {
 
   return Category.findOne({
     _id: categoryId,
-    isDeleted: false,
     isActive: true,
   }).lean();
 };
@@ -58,9 +57,7 @@ export const getSleepwearEdits = async (req, res) => {
     // remove records whose linked category
     // or product is no longer active.
     const filteredSleepwearEdits = sleepwearEdits.filter((item) => {
-      const categoryValid =
-        !item.category ||
-        (item.category.isActive === true && item.category.isDeleted === false);
+      const categoryValid = !item.category || item.category.isActive === true;
 
       const productValid =
         !item.product ||

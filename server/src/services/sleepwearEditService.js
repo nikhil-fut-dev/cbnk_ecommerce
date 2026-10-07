@@ -18,7 +18,7 @@ export const getPublishedSleepwearEdits = async () => {
       },
     ],
   })
-    .populate("category", "name slug isActive isDeleted")
+    .populate("category", "name slug isActive")
     .populate(
       "product",
       "name slug price compareAtPrice images isActive isDeleted",
@@ -37,7 +37,7 @@ export const getAllSleepwearEdits = async () => {
   return SleepwearEdit.find({
     isDeleted: false,
   })
-    .populate("category", "name slug isActive isDeleted")
+    .populate("category", "name slug isActive")
     .populate(
       "product",
       "name slug price compareAtPrice images isActive isDeleted",
@@ -55,7 +55,7 @@ export const getSleepwearEditById = async (sleepwearEditId) => {
     _id: sleepwearEditId,
     isDeleted: false,
   })
-    .populate("category", "name slug isActive isDeleted")
+    .populate("category", "name slug isActive")
     .populate(
       "product",
       "name slug price compareAtPrice images isActive isDeleted",
