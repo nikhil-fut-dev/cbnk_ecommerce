@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import {
+  Home,
   LayoutDashboard,
   Package,
   ShoppingBag,
@@ -23,6 +24,11 @@ const navigation = [
     label: "Dashboard",
     path: "/admin",
     icon: LayoutDashboard,
+  },
+  {
+    label: "Home",
+    path: "/admin/home",
+    icon: Home,
   },
   {
     label: "Products",

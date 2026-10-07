@@ -39,7 +39,6 @@ const validateCategory = async (categoryId) => {
 
   const category = await Category.findOne({
     _id: categoryId,
-    isDeleted: false,
     isActive: true,
   }).lean();
 
@@ -68,10 +67,7 @@ export const getCharacterModes = async (req, res) => {
      * jaye, customer ko card nahi dikhayenge.
      */
     const validCharacterModes = characterModes.filter(
-      (item) =>
-        item.category &&
-        item.category.isActive === true &&
-        item.category.isDeleted === false,
+      (item) => item.category && item.category.isActive === true,
     );
 
     return res.status(200).json({

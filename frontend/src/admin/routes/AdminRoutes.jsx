@@ -3,6 +3,15 @@ import { Routes, Route } from "react-router-dom";
 import AdminProtectedRoute from "./AdminProtectedRoute";
 import AdminLayout from "../layouts/AdminLayout";
 
+// Home CMS
+import AdminHome from "../pages/home/AdminHome";
+import AdminPromotionalTicker from "../pages/home/AdminPromotionalTicker";
+import AdminPromotionalTickerForm from "../pages/home/AdminPromotionalTickerForm";
+import AdminHeroBanners from "../pages/home/AdminHeroBanners";
+import AdminHeroBannerForm from "../pages/home/AdminHeroBannerForm";
+import AdminCharacterModes from "../pages/home/AdminCharacterModes";
+import AdminCharacterModeForm from "../pages/home/AdminCharacterModeForm";
+
 // Dashboard
 import AdminDashboard from "../pages/dashboard/AdminDashboard";
 
@@ -39,6 +48,52 @@ const AdminRoutes = () => {
           {/* ==================== DASHBOARD ==================== */}
 
           <Route path="/" element={<AdminDashboard />} />
+
+          {/* ==================== HOME CMS ==================== */}
+
+          <Route path="home" element={<AdminHome />} />
+
+          <Route
+            path="home/promotional-ticker"
+            element={<AdminPromotionalTicker />}
+          />
+
+          <Route
+            path="home/promotional-ticker/new"
+            element={<AdminPromotionalTickerForm />}
+          />
+
+          <Route
+            path="home/promotional-ticker/:id/edit"
+            element={<AdminPromotionalTickerForm />}
+          />
+
+          <Route path="home/hero-banners" element={<AdminHeroBanners />} />
+
+          <Route
+            path="home/hero-banners/new"
+            element={<AdminHeroBannerForm />}
+          />
+
+          <Route
+            path="home/hero-banners/:id/edit"
+            element={<AdminHeroBannerForm />}
+          />
+
+          <Route
+            path="home/character-modes"
+            element={<AdminCharacterModes />}
+          />
+
+          <Route
+            path="home/character-modes/new"
+            element={<AdminCharacterModeForm />}
+          />
+
+          <Route
+            path="home/character-modes/:id/edit"
+            element={<AdminCharacterModeForm />}
+          />
 
           {/* ==================== PRODUCTS ==================== */}
 
