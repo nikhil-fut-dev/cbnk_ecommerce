@@ -11,6 +11,8 @@ import AdminHeroBanners from "../pages/home/AdminHeroBanners";
 import AdminHeroBannerForm from "../pages/home/AdminHeroBannerForm";
 import AdminCharacterModes from "../pages/home/AdminCharacterModes";
 import AdminCharacterModeForm from "../pages/home/AdminCharacterModeForm";
+import AdminElite from "../pages/home/AdminElite";
+import AdminEliteForm from "../pages/home/AdminEliteForm";
 
 // Dashboard
 import AdminDashboard from "../pages/dashboard/AdminDashboard";
@@ -94,6 +96,12 @@ const AdminRoutes = () => {
             path="home/character-modes/:id/edit"
             element={<AdminCharacterModeForm />}
           />
+
+          <Route path="home/elite" element={<AdminElite />} />
+
+          <Route path="home/elite/new" element={<AdminEliteForm />} />
+
+          <Route path="home/elite/:id/edit" element={<AdminEliteForm />} />
 
           {/* ==================== PRODUCTS ==================== */}
 

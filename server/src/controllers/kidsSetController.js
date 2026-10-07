@@ -30,7 +30,6 @@ const validateCategory = async (categoryId) => {
 
   return Category.findOne({
     _id: categoryId,
-    isDeleted: false,
     isActive: true,
   }).lean();
 };
@@ -43,10 +42,7 @@ export const getKidsSets = async (req, res) => {
     // Extra safety check:
     // Category must still be active and available.
     const filteredKidsSets = kidsSets.filter(
-      (item) =>
-        item.category &&
-        item.category.isActive === true &&
-        item.category.isDeleted === false,
+      (item) => item.category && item.category.isActive === true,
     );
 
     return res.status(200).json({

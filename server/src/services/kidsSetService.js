@@ -18,7 +18,7 @@ export const getPublishedKidsSets = async () => {
       },
     ],
   })
-    .populate("category", "name slug isActive isDeleted")
+    .populate("category", "name slug isActive")
     .sort({
       sortOrder: 1,
       createdAt: -1,
@@ -33,7 +33,7 @@ export const getAllKidsSets = async () => {
   return KidsSet.find({
     isDeleted: false,
   })
-    .populate("category", "name slug isActive isDeleted")
+    .populate("category", "name slug isActive")
     .sort({
       sortOrder: 1,
       createdAt: -1,
@@ -47,7 +47,7 @@ export const getKidsSetById = async (kidsSetId) => {
     _id: kidsSetId,
     isDeleted: false,
   })
-    .populate("category", "name slug isActive isDeleted")
+    .populate("category", "name slug isActive")
     .lean();
 };
 
