@@ -1,3 +1,37 @@
+import { Link } from "react-router-dom";
+
+const CtaWrapper = ({ item, className, children }) => {
+  const link = item.cta?.link?.trim() || "";
+  const openInNewTab = Boolean(item.cta?.openInNewTab);
+  const isExternal = /^https?:\/\//i.test(link);
+
+  if (!link) {
+    return <div className={className}>{children}</div>;
+  }
+
+  const ariaLabel = item.cta?.text || item.title || "View collection";
+
+  if (isExternal || openInNewTab) {
+    return (
+      <a
+        href={link}
+        target={openInNewTab ? "_blank" : undefined}
+        rel={openInNewTab ? "noopener noreferrer" : undefined}
+        aria-label={ariaLabel}
+        className={className}
+      >
+        {children}
+      </a>
+    );
+  }
+
+  return (
+    <Link to={link} aria-label={ariaLabel} className={className}>
+      {children}
+    </Link>
+  );
+};
+
 const PoloShop = ({ items = [] }) => {
   if (!items.length) {
     return null;
@@ -12,11 +46,13 @@ const PoloShop = ({ items = [] }) => {
               <h2 className="inline-block text-[18px] font-bold leading-none text-black sm:text-[21px] lg:text-[24px]">
                 {item.smallText || "The Polo Shop"}
               </h2>
-
               <div className="mt-1 h-[4px] w-[50px] bg-[#d8b28a] sm:w-[55px]" />
             </div>
 
-            <div className="relative w-full overflow-hidden bg-neutral-200">
+            <CtaWrapper
+              item={item}
+              className="relative block w-full cursor-pointer overflow-hidden bg-neutral-200"
+            >
               <picture>
                 <source
                   media="(max-width: 767px)"
@@ -35,9 +71,9 @@ const PoloShop = ({ items = [] }) => {
                 />
               </picture>
 
-              <div className="absolute inset-y-0 left-0 w-[70%] bg-gradient-to-r from-black/60 via-black/25 to-transparent sm:w-[60%]" />
+              <div className="absolute inset-y-0 left-0 w-[70%] bg-gradient-to-r from-black/60 via-black/25 to-transparent sm:w-[60%] pointer-events-none" />
 
-              <div className="absolute left-[5%] top-1/2 z-10 -translate-y-1/2 text-white sm:left-[5%] lg:left-[4%]">
+              <div className="absolute left-[5%] top-1/2 z-10 -translate-y-1/2 text-white sm:left-[5%] lg:left-[4%] pointer-events-none">
                 <h2 className="max-w-[190px] text-[20px] font-bold uppercase leading-[1.05] tracking-tight text-white drop-shadow-lg sm:max-w-[280px] sm:text-[27px] md:max-w-[370px] md:text-[36px] lg:max-w-[500px] lg:text-[46px] xl:text-[52px]">
                   {item.title}
                 </h2>
@@ -46,7 +82,7 @@ const PoloShop = ({ items = [] }) => {
                   {item.priceText}
                 </p>
               </div>
-            </div>
+            </CtaWrapper>
           </div>
         ))}
       </div>

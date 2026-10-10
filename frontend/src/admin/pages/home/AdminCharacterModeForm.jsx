@@ -24,6 +24,9 @@ const AdminCharacterModeForm = () => {
     status: "DRAFT",
     startAt: "",
     endAt: "",
+    ctaText: "",
+    ctaLink: "",
+    ctaOpenInNewTab: false,
   });
 
   const [image, setImage] = useState(null);
@@ -97,6 +100,9 @@ const AdminCharacterModeForm = () => {
         status: item?.status || "DRAFT",
         startAt: formatDateTimeLocal(item?.startAt),
         endAt: formatDateTimeLocal(item?.endAt),
+        ctaText: item?.cta?.text || "",
+        ctaLink: item?.cta?.link || "",
+        ctaOpenInNewTab: item?.cta?.openInNewTab ?? false,
       });
 
       setExistingImage(item?.image?.url || "");
@@ -249,6 +255,9 @@ const AdminCharacterModeForm = () => {
         status: form.status,
         startAt: toISOStringOrNull(form.startAt),
         endAt: toISOStringOrNull(form.endAt),
+        ctaText: form.ctaText.trim(),
+        ctaLink: form.ctaLink.trim(),
+        ctaOpenInNewTab: form.ctaOpenInNewTab,
       };
 
       /*
@@ -380,6 +389,94 @@ const AdminCharacterModeForm = () => {
                 className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-black focus:ring-2 focus:ring-gray-100"
               />
             </div>
+          </div>
+        </section>
+
+        {/* CTA Settings */}
+        <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="mb-5">
+            <h2 className="text-lg font-semibold text-gray-900">
+              CTA Settings
+            </h2>
+
+            <p className="mt-1 text-sm text-gray-500">
+              Configure where customers go when they click this Character Mode.
+            </p>
+          </div>
+
+          <div className="grid gap-5">
+            {/* CTA Text */}
+            <div>
+              <label
+                htmlFor="ctaText"
+                className="mb-2 block text-sm font-medium text-gray-700"
+              >
+                CTA Text
+              </label>
+
+              <input
+                id="ctaText"
+                name="ctaText"
+                type="text"
+                maxLength={50}
+                value={form.ctaText}
+                onChange={handleChange}
+                placeholder="Example: Shop Now"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-black focus:ring-2 focus:ring-gray-100"
+              />
+
+              <p className="mt-1 text-xs text-gray-500">
+                Optional. Maximum 50 characters.
+              </p>
+            </div>
+
+            {/* CTA Link */}
+            <div>
+              <label
+                htmlFor="ctaLink"
+                className="mb-2 block text-sm font-medium text-gray-700"
+              >
+                CTA Link
+              </label>
+
+              <input
+                id="ctaLink"
+                name="ctaLink"
+                type="text"
+                maxLength={500}
+                value={form.ctaLink}
+                onChange={handleChange}
+                placeholder="/products or https://example.com"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none transition focus:border-black focus:ring-2 focus:ring-gray-100"
+              />
+
+              <p className="mt-1 text-xs text-gray-500">
+                Use an internal path such as /products or a valid HTTP/HTTPS
+                URL.
+              </p>
+            </div>
+
+            {/* Open in New Tab */}
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-4">
+              <input
+                id="ctaOpenInNewTab"
+                name="ctaOpenInNewTab"
+                type="checkbox"
+                checked={form.ctaOpenInNewTab}
+                onChange={handleChange}
+                className="mt-1 h-4 w-4 rounded border-gray-300"
+              />
+
+              <span>
+                <span className="block text-sm font-medium text-gray-900">
+                  Open in New Tab
+                </span>
+
+                <span className="mt-1 block text-xs text-gray-500">
+                  Open the CTA destination in a new browser tab.
+                </span>
+              </span>
+            </label>
           </div>
         </section>
 

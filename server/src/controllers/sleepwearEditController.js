@@ -23,6 +23,48 @@ const isValidObjectId = (id) => {
   return mongoose.Types.ObjectId.isValid(id);
 };
 
+/* =========================================================
+   CTA VALIDATION
+========================================================= */
+
+const parseBoolean = (value) => {
+  return value === true || value === "true";
+};
+
+const validateCtaLink = (value) => {
+  const link = String(value ?? "").trim();
+
+  if (!link) {
+    return { link: "" };
+  }
+
+  // Allow internal paths, but reject protocol-relative URLs.
+  if (link.startsWith("/") && !link.startsWith("//")) {
+    return { link };
+  }
+
+  // Allow only HTTP/HTTPS absolute URLs.
+  try {
+    const url = new URL(link);
+
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return { link };
+    }
+  } catch {
+    // Invalid URL.
+  }
+
+  return {
+    error: "CTA link must be a valid internal path or HTTP/HTTPS URL",
+  };
+};
+
+const buildCta = (text, link, openInNewTab) => ({
+  text: String(text ?? "").trim(),
+  link,
+  openInNewTab: parseBoolean(openInNewTab),
+});
+
 // Validate category
 const validateCategory = async (categoryId) => {
   if (!isValidObjectId(categoryId)) {
@@ -158,6 +200,9 @@ export const createAdminSleepwearEdit = async (req, res) => {
       endAt,
       desktopImageAlt,
       mobileImageAlt,
+      ctaText,
+      ctaLink,
+      ctaOpenInNewTab,
     } = req.body;
 
     // Title
@@ -204,6 +249,20 @@ export const createAdminSleepwearEdit = async (req, res) => {
       }
     }
 
+    /* CTA validation */
+
+    const validatedCtaLink = validateCtaLink(ctaLink);
+
+    if (validatedCtaLink.error) {
+      return res.status(400).json({
+        success: false,
+        message: validatedCtaLink.error,
+        errors: [],
+      });
+    }
+
+    const cta = buildCta(ctaText, validatedCtaLink.link, ctaOpenInNewTab);
+
     // Desktop + mobile images required
     if (!req.files?.desktopImage?.[0]) {
       return res.status(400).json({
@@ -237,6 +296,8 @@ export const createAdminSleepwearEdit = async (req, res) => {
       smallText: smallText?.trim() || "",
 
       title: title.trim(),
+
+      cta,
 
       priceText: priceText?.trim() || "",
 
@@ -337,9 +398,48 @@ export const updateAdminSleepwearEdit = async (req, res) => {
       endAt,
       desktopImageAlt,
       mobileImageAlt,
+      ctaText,
+      ctaLink,
+      ctaOpenInNewTab,
     } = req.body;
 
     const updateData = {};
+
+    /* CTA update */
+
+    const ctaWasProvided =
+      ctaText !== undefined ||
+      ctaLink !== undefined ||
+      ctaOpenInNewTab !== undefined;
+
+    if (ctaWasProvided) {
+      const existingCta = existingSleepwear.cta || {};
+
+      const nextText = ctaText !== undefined ? ctaText : existingCta.text || "";
+
+      const nextLink = ctaLink !== undefined ? ctaLink : existingCta.link || "";
+
+      const nextOpenInNewTab =
+        ctaOpenInNewTab !== undefined
+          ? ctaOpenInNewTab
+          : (existingCta.openInNewTab ?? false);
+
+      const validatedCtaLink = validateCtaLink(nextLink);
+
+      if (validatedCtaLink.error) {
+        return res.status(400).json({
+          success: false,
+          message: validatedCtaLink.error,
+          errors: [],
+        });
+      }
+
+      updateData.cta = buildCta(
+        nextText,
+        validatedCtaLink.link,
+        nextOpenInNewTab,
+      );
+    }
 
     // Text fields
     if (smallText !== undefined) {

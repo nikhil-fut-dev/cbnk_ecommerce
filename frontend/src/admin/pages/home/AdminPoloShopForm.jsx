@@ -50,6 +50,10 @@ const AdminPoloShopForm = () => {
 
     startAt: "",
     endAt: "",
+
+    ctaText: "",
+    ctaLink: "",
+    ctaOpenInNewTab: false,
   });
 
   // =====================================================
@@ -186,6 +190,12 @@ const AdminPoloShopForm = () => {
         startAt: formatDateTimeLocal(poloShop.startAt),
 
         endAt: formatDateTimeLocal(poloShop.endAt),
+
+        ctaText: poloShop?.cta?.text || "",
+
+        ctaLink: poloShop?.cta?.link || "",
+
+        ctaOpenInNewTab: poloShop?.cta?.openInNewTab ?? false,
       });
 
       setDesktopPreview(poloShop.desktopImage?.url || "");
@@ -383,6 +393,12 @@ const AdminPoloShopForm = () => {
         startAt: toISOStringOrNull(form.startAt),
 
         endAt: toISOStringOrNull(form.endAt),
+
+        ctaText: form.ctaText.trim(),
+
+        ctaLink: form.ctaLink.trim(),
+
+        ctaOpenInNewTab: form.ctaOpenInNewTab,
       };
 
       // Add images only if selected
@@ -474,7 +490,6 @@ const AdminPoloShopForm = () => {
         {/* ================================================= */}
         {/* BASIC INFORMATION */}
         {/* ================================================= */}
-
         <section className="rounded-xl border bg-white p-6">
           <div className="mb-5">
             <h2 className="text-lg font-semibold">Basic Information</h2>
@@ -541,9 +556,93 @@ const AdminPoloShopForm = () => {
         </section>
 
         {/* ================================================= */}
+        {/* CTA SETTINGS */}
+        {/* ================================================= */}
+        <section className="rounded-xl border bg-white p-6">
+          <div className="mb-5">
+            <h2 className="text-lg font-semibold">CTA Settings</h2>
+
+            <p className="text-sm text-gray-500">
+              Configure where customers go when they click the Polo Shop
+              section.
+            </p>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            {/* CTA TEXT */}
+            <div>
+              <label
+                htmlFor="ctaText"
+                className="mb-2 block text-sm font-medium"
+              >
+                CTA Text
+              </label>
+
+              <input
+                id="ctaText"
+                type="text"
+                name="ctaText"
+                value={form.ctaText}
+                onChange={handleChange}
+                maxLength={50}
+                placeholder="Example: Shop Now"
+                className="w-full rounded-lg border px-3 py-2.5 outline-none focus:border-black"
+              />
+            </div>
+
+            {/* CTA LINK */}
+            <div>
+              <label
+                htmlFor="ctaLink"
+                className="mb-2 block text-sm font-medium"
+              >
+                CTA Link
+              </label>
+
+              <input
+                id="ctaLink"
+                type="text"
+                name="ctaLink"
+                value={form.ctaLink}
+                onChange={handleChange}
+                maxLength={500}
+                placeholder="/products or https://example.com"
+                className="w-full rounded-lg border px-3 py-2.5 outline-none focus:border-black"
+              />
+
+              <p className="mt-1 text-xs text-gray-500">
+                Enter an internal path or an HTTP/HTTPS URL.
+              </p>
+            </div>
+
+            {/* OPEN IN NEW TAB */}
+            <div className="md:col-span-2">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  name="ctaOpenInNewTab"
+                  checked={form.ctaOpenInNewTab}
+                  onChange={handleChange}
+                  className="mt-1 h-4 w-4"
+                />
+
+                <span>
+                  <span className="block text-sm font-medium">
+                    Open in New Tab
+                  </span>
+
+                  <span className="mt-1 block text-xs text-gray-500">
+                    Open the CTA destination in a new browser tab.
+                  </span>
+                </span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        {/* ================================================= */}
         {/* CATEGORY / PRODUCT */}
         {/* ================================================= */}
-
         <section className="rounded-xl border bg-white p-6">
           <div className="mb-5">
             <h2 className="text-lg font-semibold">Category & Product</h2>
@@ -597,11 +696,9 @@ const AdminPoloShopForm = () => {
             </div>
           </div>
         </section>
-
         {/* ================================================= */}
         {/* DESKTOP IMAGE */}
         {/* ================================================= */}
-
         <section className="rounded-xl border bg-white p-6">
           <div className="mb-5">
             <h2 className="text-lg font-semibold">Desktop Image</h2>
@@ -657,11 +754,9 @@ const AdminPoloShopForm = () => {
             </div>
           )}
         </section>
-
         {/* ================================================= */}
         {/* MOBILE IMAGE */}
         {/* ================================================= */}
-
         <section className="rounded-xl border bg-white p-6">
           <div className="mb-5">
             <h2 className="text-lg font-semibold">Mobile Image</h2>
@@ -717,11 +812,9 @@ const AdminPoloShopForm = () => {
             </div>
           )}
         </section>
-
         {/* ================================================= */}
         {/* PUBLISHING */}
         {/* ================================================= */}
-
         <section className="rounded-xl border bg-white p-6">
           <h2 className="mb-5 text-lg font-semibold">Publishing Settings</h2>
 
@@ -809,11 +902,9 @@ const AdminPoloShopForm = () => {
             </div>
           </div>
         </section>
-
         {/* ================================================= */}
         {/* ACTIONS */}
         {/* ================================================= */}
-
         <div className="flex justify-end gap-3">
           <Link
             to="/admin/home/polo-shop"

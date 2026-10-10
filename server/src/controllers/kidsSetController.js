@@ -22,6 +22,48 @@ const isValidObjectId = (id) => {
   return mongoose.Types.ObjectId.isValid(id);
 };
 
+/* =========================================================
+   CTA VALIDATION
+========================================================= */
+
+const parseBoolean = (value) => {
+  return value === true || value === "true";
+};
+
+const validateCtaLink = (value) => {
+  const link = String(value ?? "").trim();
+
+  if (!link) {
+    return { link: "" };
+  }
+
+  // Allow internal paths, but reject protocol-relative URLs.
+  if (link.startsWith("/") && !link.startsWith("//")) {
+    return { link };
+  }
+
+  // Allow only HTTP/HTTPS absolute URLs.
+  try {
+    const url = new URL(link);
+
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return { link };
+    }
+  } catch {
+    // Invalid URL.
+  }
+
+  return {
+    error: "CTA link must be a valid internal path or HTTP/HTTPS URL",
+  };
+};
+
+const buildCta = (text, link, openInNewTab) => ({
+  text: String(text ?? "").trim(),
+  link,
+  openInNewTab: parseBoolean(openInNewTab),
+});
+
 // Validate category
 const validateCategory = async (categoryId) => {
   if (!isValidObjectId(categoryId)) {
@@ -133,6 +175,9 @@ export const createAdminKidsSet = async (req, res) => {
       startAt,
       endAt,
       imageAlt,
+      ctaText,
+      ctaLink,
+      ctaOpenInNewTab,
     } = req.body;
 
     // Title
@@ -163,6 +208,20 @@ export const createAdminKidsSet = async (req, res) => {
       });
     }
 
+    /* CTA validation */
+
+    const validatedCtaLink = validateCtaLink(ctaLink);
+
+    if (validatedCtaLink.error) {
+      return res.status(400).json({
+        success: false,
+        message: validatedCtaLink.error,
+        errors: [],
+      });
+    }
+
+    const cta = buildCta(ctaText, validatedCtaLink.link, ctaOpenInNewTab);
+
     // Image
     if (!req.file) {
       return res.status(400).json({
@@ -182,6 +241,8 @@ export const createAdminKidsSet = async (req, res) => {
       title: title.trim(),
 
       description: description?.trim() || "",
+
+      cta,
 
       category,
 
@@ -265,9 +326,48 @@ export const updateAdminKidsSet = async (req, res) => {
       startAt,
       endAt,
       imageAlt,
+      ctaText,
+      ctaLink,
+      ctaOpenInNewTab,
     } = req.body;
 
     const updateData = {};
+
+    /* CTA update */
+
+    const ctaWasProvided =
+      ctaText !== undefined ||
+      ctaLink !== undefined ||
+      ctaOpenInNewTab !== undefined;
+
+    if (ctaWasProvided) {
+      const existingCta = existingKidsSet.cta || {};
+
+      const nextText = ctaText !== undefined ? ctaText : existingCta.text || "";
+
+      const nextLink = ctaLink !== undefined ? ctaLink : existingCta.link || "";
+
+      const nextOpenInNewTab =
+        ctaOpenInNewTab !== undefined
+          ? ctaOpenInNewTab
+          : (existingCta.openInNewTab ?? false);
+
+      const validatedCtaLink = validateCtaLink(nextLink);
+
+      if (validatedCtaLink.error) {
+        return res.status(400).json({
+          success: false,
+          message: validatedCtaLink.error,
+          errors: [],
+        });
+      }
+
+      updateData.cta = buildCta(
+        nextText,
+        validatedCtaLink.link,
+        nextOpenInNewTab,
+      );
+    }
 
     // Title
     if (title !== undefined) {

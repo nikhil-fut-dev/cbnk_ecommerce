@@ -63,6 +63,27 @@ const poloShopSchema = new mongoose.Schema(
       },
     },
 
+    cta: {
+      text: {
+        type: String,
+        default: "",
+        trim: true,
+        maxlength: 50,
+      },
+
+      link: {
+        type: String,
+        default: "",
+        trim: true,
+        maxlength: 500,
+      },
+
+      openInNewTab: {
+        type: Boolean,
+        default: false,
+      },
+    },
+
     category: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",

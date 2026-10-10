@@ -45,6 +45,40 @@ const parseNumber = (value, defaultValue = 0) => {
   return Number.isFinite(parsed) ? parsed : defaultValue;
 };
 
+const validateCtaLink = (value) => {
+  const link = String(value ?? "").trim();
+
+  if (!link) {
+    return { link: "" };
+  }
+
+  // Allow internal paths, but reject protocol-relative URLs.
+  if (link.startsWith("/") && !link.startsWith("//")) {
+    return { link };
+  }
+
+  // Allow only absolute HTTP/HTTPS URLs.
+  try {
+    const url = new URL(link);
+
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return { link };
+    }
+  } catch {
+    // Invalid URL.
+  }
+
+  return {
+    error: "CTA link must be a valid internal path or HTTP/HTTPS URL",
+  };
+};
+
+const buildCta = (text, link, openInNewTab) => ({
+  text: String(text ?? "").trim(),
+  link,
+  openInNewTab: parseBoolean(openInNewTab, false),
+});
+
 const validateCategory = async (categoryId) => {
   if (!mongoose.Types.ObjectId.isValid(categoryId)) {
     return null;
@@ -191,6 +225,9 @@ export const createAdminPoloShop = async (req, res) => {
       endAt,
       desktopImageAlt,
       mobileImageAlt,
+      ctaText,
+      ctaLink,
+      ctaOpenInNewTab,
     } = req.body;
 
     if (!title || !title.trim()) {
@@ -235,6 +272,20 @@ export const createAdminPoloShop = async (req, res) => {
       }
     }
 
+    /* CTA validation */
+
+    const validatedCtaLink = validateCtaLink(ctaLink);
+
+    if (validatedCtaLink.error) {
+      return res.status(400).json({
+        success: false,
+        message: validatedCtaLink.error,
+        errors: [],
+      });
+    }
+
+    const cta = buildCta(ctaText, validatedCtaLink.link, ctaOpenInNewTab);
+
     // Images
     const desktopFile = req.files?.desktopImage?.[0];
 
@@ -272,6 +323,8 @@ export const createAdminPoloShop = async (req, res) => {
       smallText: smallText?.trim() || "",
 
       title: title.trim(),
+
+      cta,
 
       priceText: priceText?.trim() || "",
 
@@ -375,6 +428,9 @@ export const updateAdminPoloShop = async (req, res) => {
       endAt,
       desktopImageAlt,
       mobileImageAlt,
+      ctaText,
+      ctaLink,
+      ctaOpenInNewTab,
     } = req.body;
 
     // ---------------------------------------------
@@ -447,6 +503,44 @@ export const updateAdminPoloShop = async (req, res) => {
     }
 
     const updateData = {};
+
+    /* ---------------------------------------------
+          CTA update
+      --------------------------------------------- */
+
+    const ctaWasProvided =
+      ctaText !== undefined ||
+      ctaLink !== undefined ||
+      ctaOpenInNewTab !== undefined;
+
+    if (ctaWasProvided) {
+      const existingCta = existing.cta || {};
+
+      const nextText = ctaText !== undefined ? ctaText : existingCta.text || "";
+
+      const nextLink = ctaLink !== undefined ? ctaLink : existingCta.link || "";
+
+      const nextOpenInNewTab =
+        ctaOpenInNewTab !== undefined
+          ? ctaOpenInNewTab
+          : (existingCta.openInNewTab ?? false);
+
+      const validatedCtaLink = validateCtaLink(nextLink);
+
+      if (validatedCtaLink.error) {
+        return res.status(400).json({
+          success: false,
+          message: validatedCtaLink.error,
+          errors: [],
+        });
+      }
+
+      updateData.cta = buildCta(
+        nextText,
+        validatedCtaLink.link,
+        nextOpenInNewTab,
+      );
+    }
 
     if (smallText !== undefined) {
       updateData.smallText = smallText.trim();

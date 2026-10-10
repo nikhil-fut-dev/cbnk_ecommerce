@@ -50,6 +50,10 @@ const AdminSleepwearEditForm = () => {
 
     startAt: "",
     endAt: "",
+
+    ctaText: "",
+    ctaLink: "",
+    ctaOpenInNewTab: false,
   });
 
   // ---------------------------------------
@@ -157,6 +161,12 @@ const AdminSleepwearEditForm = () => {
         startAt: formatDateTimeLocal(sleepwear.startAt),
 
         endAt: formatDateTimeLocal(sleepwear.endAt),
+
+        ctaText: sleepwear?.cta?.text || "",
+
+        ctaLink: sleepwear?.cta?.link || "",
+
+        ctaOpenInNewTab: sleepwear?.cta?.openInNewTab ?? false,
       });
 
       setDesktopPreview(sleepwear.desktopImage?.url || "");
@@ -353,6 +363,12 @@ const AdminSleepwearEditForm = () => {
         startAt: toISOStringOrNull(form.startAt),
 
         endAt: toISOStringOrNull(form.endAt),
+
+        ctaText: form.ctaText.trim(),
+
+        ctaLink: form.ctaLink.trim(),
+
+        ctaOpenInNewTab: form.ctaOpenInNewTab,
       };
 
       // Images only when selected
@@ -504,6 +520,90 @@ const AdminSleepwearEditForm = () => {
         </section>
 
         {/* -------------------------------- */}
+        {/* CTA Settings */}
+        {/* -------------------------------- */}
+        <section className="rounded-xl border bg-white p-6">
+          <div className="mb-5">
+            <h2 className="text-lg font-semibold">CTA Settings</h2>
+
+            <p className="text-sm text-gray-500">
+              Configure where customers go when they click the Sleepwear Edit.
+            </p>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            {/* CTA Text */}
+            <div>
+              <label
+                htmlFor="ctaText"
+                className="mb-2 block text-sm font-medium"
+              >
+                CTA Text
+              </label>
+
+              <input
+                id="ctaText"
+                type="text"
+                name="ctaText"
+                value={form.ctaText}
+                onChange={handleChange}
+                maxLength={50}
+                placeholder="Example: Shop Now"
+                className="w-full rounded-lg border px-3 py-2.5 outline-none focus:border-black"
+              />
+            </div>
+
+            {/* CTA Link */}
+            <div>
+              <label
+                htmlFor="ctaLink"
+                className="mb-2 block text-sm font-medium"
+              >
+                CTA Link
+              </label>
+
+              <input
+                id="ctaLink"
+                type="text"
+                name="ctaLink"
+                value={form.ctaLink}
+                onChange={handleChange}
+                maxLength={500}
+                placeholder="/products or https://example.com"
+                className="w-full rounded-lg border px-3 py-2.5 outline-none focus:border-black"
+              />
+
+              <p className="mt-1 text-xs text-gray-500">
+                Enter an internal path or an HTTP/HTTPS URL.
+              </p>
+            </div>
+
+            {/* Open in New Tab */}
+            <div className="md:col-span-2">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  name="ctaOpenInNewTab"
+                  checked={form.ctaOpenInNewTab}
+                  onChange={handleChange}
+                  className="mt-1 h-4 w-4"
+                />
+
+                <span>
+                  <span className="block text-sm font-medium">
+                    Open in New Tab
+                  </span>
+
+                  <span className="mt-1 block text-xs text-gray-500">
+                    Open the CTA destination in a new browser tab.
+                  </span>
+                </span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        {/* -------------------------------- */}
         {/* Relations */}
         {/* -------------------------------- */}
         <section className="rounded-xl border bg-white p-6">
@@ -557,7 +657,6 @@ const AdminSleepwearEditForm = () => {
             </div>
           </div>
         </section>
-
         {/* -------------------------------- */}
         {/* Desktop Image */}
         {/* -------------------------------- */}
@@ -620,7 +719,6 @@ const AdminSleepwearEditForm = () => {
             </div>
           )}
         </section>
-
         {/* -------------------------------- */}
         {/* Mobile Image */}
         {/* -------------------------------- */}
@@ -683,7 +781,6 @@ const AdminSleepwearEditForm = () => {
             </div>
           )}
         </section>
-
         {/* -------------------------------- */}
         {/* Publishing */}
         {/* -------------------------------- */}
@@ -775,7 +872,6 @@ const AdminSleepwearEditForm = () => {
             </div>
           </div>
         </section>
-
         {/* -------------------------------- */}
         {/* Actions */}
         {/* -------------------------------- */}
