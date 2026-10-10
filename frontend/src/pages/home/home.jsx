@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Truck, Cake, Star } from "lucide-react";
 import { getHomeData } from "../../services/homeApi";
 
 import PromotionalTicker from "../../components/home/PromotionalTicker";
